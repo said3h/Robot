@@ -98,7 +98,7 @@ public static class BotiSceneBuilder
         Paint(robot, robotMat);
 
         // Add BotiRobotController for grid-based movement
-        BotiRobotController rc = robot.AddComponent<BotiRobotController>();
+        robot.AddComponent<BotiRobotController>();
 
         GameObject goal = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         goal.name = "Goal";
@@ -121,6 +121,11 @@ public static class BotiSceneBuilder
             obstacle.transform.localScale = new Vector3(0.8f, 1f, 0.8f);
             Paint(obstacle, obstacleMat);
         }
+
+        // Create CommandQueue object
+        GameObject commandQueueObj = new GameObject("CommandQueue");
+        BotiCommandQueue cmdQueue = commandQueueObj.AddComponent<BotiCommandQueue>();
+        cmdQueue.robotController = robot.GetComponent<BotiRobotController>();
     }
 
     static void CreateControlPanel()
@@ -136,33 +141,79 @@ public static class BotiSceneBuilder
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.pixelPerfect = true;
 
-        // Find robot to get reference for buttons
-        BotiRobotController robotController = GameObject.Find("Robot")?.GetComponent<BotiRobotController>();
+        // Find CommandQueue
+        BotiCommandQueue cmdQueue = GameObject.Find("CommandQueue")?.GetComponent<BotiCommandQueue>();
 
-        if (robotController == null)
+        if (cmdQueue == null)
         {
-            Debug.LogWarning("Robot not found - UI buttons will not be linked");
+            Debug.LogWarning("CommandQueue not found - UI buttons will not be linked");
             return;
         }
 
         // Create button style
         GameObject buttonPrefab = CreateButtonPrefab();
 
-        // Create Up button
-        CreateButton(canvasObj.transform, buttonPrefab, "Up", new Vector2(0, -80),
-            () => robotController.MoveNorth());
+        // === Bottom Panel Background ===
+        GameObject bottomPanel = new GameObject("BottomPanel");
+        bottomPanel.transform.parent = canvasObj.transform;
+        Image panelBg = bottomPanel.AddComponent<Image>();
+        panelBg.color = new Color(0.08f, 0.08f, 0.12f, 0.98f);
+        RectTransform panelRect = bottomPanel.GetComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0, 0);
+        panelRect.anchorMax = new Vector2(1, 0);
+        panelRect.sizeDelta = new Vector2(0, 260);
+        panelRect.anchoredPosition = new Vector2(0, 130);
 
-        // Create Down button
-        CreateButton(canvasObj.transform, buttonPrefab, "Down", new Vector2(0, 80),
-            () => robotController.MoveSouth());
+        // === Command Queue Display ===
+        GameObject queueTextObj = new GameObject("QueueDisplay");
+        queueTextObj.transform.parent = bottomPanel.transform;
+        Text queueText = queueTextObj.AddComponent<Text>();
+        queueText.text = "Commands: (empty)";
+        queueText.fontSize = 22;
+        queueText.color = new Color(0.7f, 0.9f, 0.7f);
+        queueText.alignment = TextAnchor.MiddleCenter;
+        queueText.fontStyle = FontStyle.Bold;
+        RectTransform queueRect = queueTextObj.GetComponent<RectTransform>();
+        queueRect.anchorMin = new Vector2(0.1f, 0.75f);
+        queueRect.anchorMax = new Vector2(0.9f, 1f);
+        queueRect.sizeDelta = new Vector2(0, 40);
+        queueRect.anchoredPosition = new Vector2(0, 0);
 
-        // Create Left button
-        CreateButton(canvasObj.transform, buttonPrefab, "Left", new Vector2(-100, 0),
-            () => robotController.MoveWest());
+        // Subscribe to command changes to update display
+        cmdQueue.OnCommandsChanged += () =>
+        {
+            string display = cmdQueue.GetCommandsDisplay();
+            queueText.text = "Commands: " + (display == "(empty)" ? "(empty)" : display);
+        };
 
-        // Create Right button
-        CreateButton(canvasObj.transform, buttonPrefab, "Right", new Vector2(100, 0),
-            () => robotController.MoveEast());
+        // === Direction Buttons - D-Pad Layout ===
+        float dpadSize = 70;
+
+        // Up button (center top)
+        CreateButton(bottomPanel.transform, buttonPrefab, "Up", 0.25f, 0.45f, dpadSize, dpadSize,
+            () => cmdQueue.AddMoveUp());
+
+        // Left button (left middle)
+        CreateButton(bottomPanel.transform, buttonPrefab, "Left", 0.17f, 0.2f, dpadSize, dpadSize,
+            () => cmdQueue.AddMoveLeft());
+
+        // Down button (center bottom)
+        CreateButton(bottomPanel.transform, buttonPrefab, "Down", 0.25f, 0.2f, dpadSize, dpadSize,
+            () => cmdQueue.AddMoveDown());
+
+        // Right button (right middle)
+        CreateButton(bottomPanel.transform, buttonPrefab, "Right", 0.33f, 0.2f, dpadSize, dpadSize,
+            () => cmdQueue.AddMoveRight());
+
+        // === Action Buttons (right side) ===
+        CreateButton(bottomPanel.transform, buttonPrefab, "Run", 0.68f, 0.45f, 90, 50,
+            () => cmdQueue.RunCommands());
+
+        CreateButton(bottomPanel.transform, buttonPrefab, "Clear", 0.83f, 0.45f, 90, 50,
+            () => cmdQueue.ClearCommands());
+
+        CreateButton(bottomPanel.transform, buttonPrefab, "Reset", 0.68f, 0.2f, 90, 50,
+            () => cmdQueue.ResetLevel());
     }
 
     static GameObject CreateButtonPrefab()
@@ -177,7 +228,7 @@ public static class BotiSceneBuilder
         textObj.AddComponent<Text>().text = "Button";
         textObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
         textObj.GetComponent<Text>().color = Color.white;
-        textObj.GetComponent<Text>().fontSize = 24;
+        textObj.GetComponent<Text>().fontSize = 22;
         textObj.GetComponent<Text>().fontStyle = FontStyle.Bold;
 
         // Set Text to fill parent
@@ -187,19 +238,19 @@ public static class BotiSceneBuilder
 
         // Add Image for background
         Image img = buttonObj.AddComponent<Image>();
-        img.color = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+        img.color = new Color(0.25f, 0.35f, 0.45f, 0.95f);
 
         // Add Button component
         Button btn = buttonObj.AddComponent<Button>();
         ColorBlock colors = btn.colors;
-        colors.highlightedColor = new Color(0.3f, 0.3f, 0.3f);
-        colors.pressedColor = new Color(0.5f, 0.5f, 0.5f);
+        colors.highlightedColor = new Color(0.35f, 0.5f, 0.65f);
+        colors.pressedColor = new Color(0.15f, 0.25f, 0.35f);
         btn.colors = colors;
 
         return buttonObj;
     }
 
-    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 position, UnityEngine.Events.UnityAction callback)
+    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 anchorMin, Vector2 anchorMax, float width, float height, UnityEngine.Events.UnityAction callback)
     {
         GameObject button = Object.Instantiate(prefab);
         button.SetActive(true);
@@ -209,15 +260,27 @@ public static class BotiSceneBuilder
         // Set label text
         button.transform.GetChild(0).GetComponent<Text>().text = label;
 
-        // Set position and size
+        // Set position and size using anchor-based positioning
         RectTransform rect = button.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(100, 60);
-        rect.anchoredPosition = position;
+        rect.sizeDelta = new Vector2(width, height);
+        rect.anchoredPosition = Vector2.zero;
 
         // Add click listener
         button.GetComponent<Button>().onClick.AddListener(callback);
+    }
+
+    // New overload: x, y as separate floats for anchorMin/anchorMax
+    static void CreateButton(Transform parent, GameObject prefab, string label, float anchorX, float anchorY, float width, float height, UnityEngine.Events.UnityAction callback)
+    {
+        CreateButton(parent, prefab, label, new Vector2(anchorX, anchorY), new Vector2(anchorX, anchorY), width, height, callback);
+    }
+
+    // Keep old signature for compatibility
+    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
+    {
+        CreateButton(parent, prefab, label, anchoredPosition, anchoredPosition, 70, 50, callback);
     }
 }

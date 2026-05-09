@@ -8,7 +8,10 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class BotiRobotController : MonoBehaviour
 {
-    private Vector2Int gridPosition = new Vector2Int(-3, -3);
+    // Initial start position
+    private readonly Vector2Int startPosition = new Vector2Int(-3, -3);
+
+    private Vector2Int gridPosition;
 
     private const int boardMin = -3;
     private const int boardMax = 3;
@@ -114,5 +117,15 @@ public class BotiRobotController : MonoBehaviour
     private void ApplyGridPosition()
     {
         transform.position = new Vector3(gridPosition.x, 0.8f, gridPosition.y);
+    }
+
+    /// <summary>
+    /// Reset robot to initial position.
+    /// </summary>
+    public void ResetRobot()
+    {
+        gridPosition = startPosition;
+        ApplyGridPosition();
+        Debug.Log("Robot reset to start position");
     }
 }
