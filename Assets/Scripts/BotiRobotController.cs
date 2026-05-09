@@ -18,7 +18,26 @@ public class BotiRobotController : MonoBehaviour
     [Tooltip("Time to rotate 90 degrees (seconds)")]
     public float rotateTime = 0.15f;
 
-    // Current direction the robot is facing (0=North/forward, 1=East, 2=South, 3=West)
+    [Header("Board Settings")]
+    [Tooltip("Board minimum X coordinate")]
+    public int boardMinX = -3;
+
+    [Tooltip("Board maximum X coordinate")]
+    public int boardMaxX = 3;
+
+    [Tooltip("Board minimum Z coordinate")]
+    public int boardMinZ = -3;
+
+    [Tooltip("Board maximum Z coordinate")]
+    public int boardMaxZ = 3;
+
+    [Tooltip("Goal position X")]
+    public int goalX = 3;
+
+    [Tooltip("Goal position Z")]
+    public int goalZ = 3;
+
+    // Current direction the robot is facing (0=North, 1=East, 2=South, 3=West)
     private int currentDirection = 1; // Start facing East (right)
 
     // Movement state
@@ -34,12 +53,19 @@ public class BotiRobotController : MonoBehaviour
     private Quaternion targetRot;
 
     // Array of direction vectors: North, East, South, West
-    // Using 0=North(Z+), 1=East(X+), 2=South(Z-), 3=West(X-)
     private readonly Vector3[] directionVectors = {
         Vector3.forward,  // North (0)
-        Vector3.right,   // East (1)
-        Vector3.back,    // South (2)
-        Vector3.left     // West (3)
+        Vector3.right,    // East (1)
+        Vector3.back,     // South (2)
+        Vector3.left      // West (3)
+    };
+
+    // Obstacle positions (X, Z)
+    private readonly Vector2Int[] obstacles = {
+        new Vector2Int(0, 0),
+        new Vector2Int(1, 0),
+        new Vector2Int(-1, 1),
+        new Vector2Int(2, -1)
     };
 
     void Update()
@@ -56,7 +82,7 @@ public class BotiRobotController : MonoBehaviour
         // W - Move forward one tile
         if (keyboard.wKey.wasPressedThisFrame)
         {
-            MoveForward();
+            TryMoveForward();
         }
         // A - Rotate left 90 degrees
         else if (keyboard.aKey.wasPressedThisFrame)
@@ -85,22 +111,54 @@ public class BotiRobotController : MonoBehaviour
     }
 
     /// <summary>
-    /// Move the robot forward one tile in the current direction.
+    /// Try to move the robot forward one tile.
+    /// Checks board limits and obstacles before moving.
     /// </summary>
-    void MoveForward()
+    void TryMoveForward()
     {
-        // Store starting position
+        // Calculate target position
+        Vector3 newPos = transform.position + directionVectors[currentDirection] * tileSize;
+        int newX = Mathf.RoundToInt(newPos.x);
+        int newZ = Mathf.RoundToInt(newPos.z);
+
+        // Check board boundaries
+        if (newX < boardMinX || newX > boardMaxX || newZ < boardMinZ || newZ > boardMaxZ)
+        {
+            Debug.Log("Movement blocked: outside the board!");
+            return;
+        }
+
+        // Check obstacles
+        if (IsObstacle(newX, newZ))
+        {
+            Debug.Log("Movement blocked: obstacle!");
+            return;
+        }
+
+        // Check goal
+        if (newX == goalX && newZ == goalZ)
+        {
+            Debug.Log("Boti reached the goal!");
+        }
+
+        // Start movement
         startPos = transform.position;
-
-        // Calculate target position: current position + direction vector * tile size
-        // directionVectors[currentDirection] gives the forward direction
-        targetPos = startPos + directionVectors[currentDirection] * tileSize;
-
-        // Reset animation progress
+        targetPos = newPos;
         moveProgress = 0f;
-
-        // Start moving
         isMoving = true;
+    }
+
+    /// <summary>
+    /// Check if a position has an obstacle.
+    /// </summary>
+    bool IsObstacle(int x, int z)
+    {
+        foreach (Vector2Int obs in obstacles)
+        {
+            if (obs.x == x && obs.y == z)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -108,19 +166,10 @@ public class BotiRobotController : MonoBehaviour
     /// </summary>
     void RotateLeft()
     {
-        // Store starting rotation
         startRot = transform.rotation;
-
-        // Decrease direction (wraps from 0 to 3)
         currentDirection = (currentDirection + 3) % 4;
-
-        // Calculate target rotation (90 degrees around Y axis)
         targetRot = Quaternion.Euler(0, currentDirection * 90f, 0);
-
-        // Reset animation progress
         rotateProgress = 0f;
-
-        // Start rotating
         isRotating = true;
     }
 
@@ -129,77 +178,53 @@ public class BotiRobotController : MonoBehaviour
     /// </summary>
     void RotateRight()
     {
-        // Store starting rotation
         startRot = transform.rotation;
-
-        // Increase direction (wraps from 3 to 0)
         currentDirection = (currentDirection + 1) % 4;
-
-        // Calculate target rotation (90 degrees around Y axis)
         targetRot = Quaternion.Euler(0, currentDirection * 90f, 0);
-
-        // Reset animation progress
         rotateProgress = 0f;
-
-        // Start rotating
         isRotating = true;
     }
 
     /// <summary>
     /// Update movement animation using linear interpolation (Lerp).
-    /// Called every FixedUpdate while isMoving is true.
     /// </summary>
     void MoveProgress()
     {
-        // Increase progress based on time
         moveProgress += Time.fixedDeltaTime / moveTime;
 
-        // Clamp progress to 1 (prevents overshooting)
         if (moveProgress >= 1f)
         {
             moveProgress = 1f;
             isMoving = false;
-
-            // Snap to exact target position
             transform.position = targetPos;
         }
         else
         {
-            // Interpolate position from start to target
-            // Lerp(start, end, t) returns a point between start and end
             transform.position = Vector3.Lerp(startPos, targetPos, moveProgress);
         }
     }
 
     /// <summary>
     /// Update rotation animation using spherical interpolation (Slerp).
-    /// Called every FixedUpdate while isRotating is true.
     /// </summary>
     void RotateProgress()
     {
-        // Increase progress based on time
         rotateProgress += Time.fixedDeltaTime / rotateTime;
 
-        // Clamp progress to 1 (prevents overshooting)
         if (rotateProgress >= 1f)
         {
             rotateProgress = 1f;
             isRotating = false;
-
-            // Snap to exact target rotation
             transform.rotation = targetRot;
         }
         else
         {
-            // Interpolate rotation from start to target
-            // Slerp is used for rotation (handles angle interpolation correctly)
             transform.rotation = Quaternion.Slerp(startRot, targetRot, rotateProgress);
         }
     }
 
     /// <summary>
-    /// Check if the robot is currently moving or rotating.
-    /// Useful for other scripts that need to wait for robot to be idle.
+    /// Check if the robot is currently idle (not moving or rotating).
     /// </summary>
     public bool IsIdle()
     {
