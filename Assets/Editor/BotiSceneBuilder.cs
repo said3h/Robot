@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
@@ -15,6 +16,7 @@ public static class BotiSceneBuilder
         CreateCamera();
         CreateLight();
         CreateTestGrid();
+        CreateControlPanel();
 
         if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
             AssetDatabase.CreateFolder("Assets", "Scenes");
@@ -93,7 +95,6 @@ public static class BotiSceneBuilder
         GameObject robot = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         robot.name = "Robot";
         robot.transform.position = new Vector3(-3, 0.8f, -3);
-        robot.transform.rotation = Quaternion.Euler(0, 90f, 0); // Start facing East
         Paint(robot, robotMat);
 
         // Add BotiRobotController for grid-based movement
@@ -120,5 +121,103 @@ public static class BotiSceneBuilder
             obstacle.transform.localScale = new Vector3(0.8f, 1f, 0.8f);
             Paint(obstacle, obstacleMat);
         }
+    }
+
+    static void CreateControlPanel()
+    {
+        // Create Canvas for UI
+        GameObject canvasObj = new GameObject("ControlPanel");
+        canvasObj.AddComponent<Canvas>();
+        canvasObj.AddComponent<CanvasScaler>();
+        canvasObj.AddComponent<GraphicRaycaster>();
+
+        // Make Canvas render in Screen Space Overlay
+        Canvas canvas = canvasObj.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.pixelPerfect = true;
+
+        // Find robot to get reference for buttons
+        BotiRobotController robotController = GameObject.Find("Robot")?.GetComponent<BotiRobotController>();
+
+        if (robotController == null)
+        {
+            Debug.LogWarning("Robot not found - UI buttons will not be linked");
+            return;
+        }
+
+        // Create button style
+        GameObject buttonPrefab = CreateButtonPrefab();
+
+        // Create Up button
+        CreateButton(canvasObj.transform, buttonPrefab, "Up", new Vector2(0, -80),
+            () => robotController.MoveNorth());
+
+        // Create Down button
+        CreateButton(canvasObj.transform, buttonPrefab, "Down", new Vector2(0, 80),
+            () => robotController.MoveSouth());
+
+        // Create Left button
+        CreateButton(canvasObj.transform, buttonPrefab, "Left", new Vector2(-100, 0),
+            () => robotController.MoveWest());
+
+        // Create Right button
+        CreateButton(canvasObj.transform, buttonPrefab, "Right", new Vector2(100, 0),
+            () => robotController.MoveEast());
+    }
+
+    static GameObject CreateButtonPrefab()
+    {
+        // Create a simple button using Unity UI
+        GameObject buttonObj = new GameObject("Button");
+        buttonObj.SetActive(false);
+
+        // Add Text for label
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.parent = buttonObj.transform;
+        textObj.AddComponent<Text>().text = "Button";
+        textObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+        textObj.GetComponent<Text>().color = Color.white;
+        textObj.GetComponent<Text>().fontSize = 24;
+        textObj.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // Set Text to fill parent
+        textObj.GetComponent<RectTransform>().anchorMin = Vector2.zero;
+        textObj.GetComponent<RectTransform>().anchorMax = Vector2.one;
+        textObj.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
+
+        // Add Image for background
+        Image img = buttonObj.AddComponent<Image>();
+        img.color = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+
+        // Add Button component
+        Button btn = buttonObj.AddComponent<Button>();
+        ColorBlock colors = btn.colors;
+        colors.highlightedColor = new Color(0.3f, 0.3f, 0.3f);
+        colors.pressedColor = new Color(0.5f, 0.5f, 0.5f);
+        btn.colors = colors;
+
+        return buttonObj;
+    }
+
+    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 position, UnityEngine.Events.UnityAction callback)
+    {
+        GameObject button = Object.Instantiate(prefab);
+        button.SetActive(true);
+        button.name = label + "Button";
+        button.transform.parent = parent;
+
+        // Set label text
+        button.transform.GetChild(0).GetComponent<Text>().text = label;
+
+        // Set position and size
+        RectTransform rect = button.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(100, 60);
+        rect.anchoredPosition = position;
+
+        // Add click listener
+        button.GetComponent<Button>().onClick.AddListener(callback);
     }
 }
