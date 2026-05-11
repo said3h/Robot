@@ -1,8 +1,9 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Script simple para mover a Boti en una cuadrícula.
-/// 
+///
 /// Controles:
 /// - W: Mover hacia adelante
 /// - A: Girar a la izquierda
@@ -10,34 +11,27 @@ using UnityEngine;
 /// </summary>
 public class BotiMovement : MonoBehaviour
 {
-    // Velocidad de rotación (grados por segundo)
     public float rotationSpeed = 90f;
-    
-    // Velocidad de movimiento (unidades por segundo)
     public float moveSpeed = 3f;
 
     void Update()
     {
-        // Girar a la izquierda con A
-        if (Input.GetKey(KeyCode.A))
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        if (keyboard.aKey.isPressed)
         {
             transform.Rotate(0f, -rotationSpeed * Time.deltaTime, 0f);
-            Debug.Log("A presionado - Girando a la izquierda");
         }
 
-        // Girar a la derecha con D
-        if (Input.GetKey(KeyCode.D))
+        if (keyboard.dKey.isPressed)
         {
             transform.Rotate(0f, rotationSpeed * Time.deltaTime, 0f);
-            Debug.Log("D presionado - Girando a la derecha");
         }
 
-        // Mover hacia adelante con W
-        if (Input.GetKey(KeyCode.W))
+        if (keyboard.wKey.isPressed)
         {
-            // Mover en la dirección hacia donde mira el robot (espacio local)
             transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime, Space.Self);
-            Debug.Log("W presionado - Moviendo hacia adelante");
         }
     }
 }

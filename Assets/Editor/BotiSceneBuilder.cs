@@ -34,10 +34,13 @@ public static class BotiSceneBuilder
         {
             Object.DestroyImmediate(es.gameObject);
         }
-        
+
         GameObject eventSystemObj = new GameObject("EventSystem");
         eventSystemObj.AddComponent<EventSystem>();
-        eventSystemObj.AddComponent<StandaloneInputModule>();
+
+        // Use InputSystemUIInputModule instead of StandaloneInputModule
+        // to avoid legacy Input.GetButton errors
+        eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
     }
 
     static void CreateCamera()
