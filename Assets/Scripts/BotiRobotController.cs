@@ -2,20 +2,14 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Direct grid movement controller for Boti.
-/// W/A/S/D = move in cardinal directions.
-/// No rotation, no facing direction.
+/// Direct grid movement controller for Boti robot.
 /// </summary>
 public class BotiRobotController : MonoBehaviour
 {
-    // Initial start position
     private readonly Vector2Int startPosition = new Vector2Int(-3, -3);
-
     private Vector2Int gridPosition;
-
     private const int boardMin = -3;
     private const int boardMax = 3;
-
     private readonly Vector2Int goalPosition = new Vector2Int(3, 3);
 
     private readonly Vector2Int[] obstacles =
@@ -37,40 +31,36 @@ public class BotiRobotController : MonoBehaviour
         if (keyboard == null) return;
 
         if (keyboard.wKey.wasPressedThisFrame)
-        {
             MoveNorth();
-        }
         else if (keyboard.sKey.wasPressedThisFrame)
-        {
             MoveSouth();
-        }
         else if (keyboard.aKey.wasPressedThisFrame)
-        {
             MoveWest();
-        }
         else if (keyboard.dKey.wasPressedThisFrame)
-        {
             MoveEast();
-        }
     }
 
     public void MoveNorth()
     {
+        Debug.Log("MoveNorth called");
         TryMove(new Vector2Int(0, 1));
     }
 
     public void MoveSouth()
     {
+        Debug.Log("MoveSouth called");
         TryMove(new Vector2Int(0, -1));
     }
 
     public void MoveWest()
     {
+        Debug.Log("MoveWest called");
         TryMove(new Vector2Int(-1, 0));
     }
 
     public void MoveEast()
     {
+        Debug.Log("MoveEast called");
         TryMove(new Vector2Int(1, 0));
     }
 
@@ -78,7 +68,6 @@ public class BotiRobotController : MonoBehaviour
     {
         Vector2Int nextPosition = gridPosition + direction;
 
-        // Check board limits
         if (nextPosition.x < boardMin || nextPosition.x > boardMax ||
             nextPosition.y < boardMin || nextPosition.y > boardMax)
         {
@@ -86,31 +75,23 @@ public class BotiRobotController : MonoBehaviour
             return;
         }
 
-        // Check obstacles
         if (IsObstacle(nextPosition))
         {
             Debug.Log("Movement blocked: obstacle!");
             return;
         }
 
-        // Move
         gridPosition = nextPosition;
         ApplyGridPosition();
 
-        // Check goal
         if (gridPosition == goalPosition)
-        {
             Debug.Log("Boti reached the goal!");
-        }
     }
 
     private bool IsObstacle(Vector2Int position)
     {
         foreach (Vector2Int obstacle in obstacles)
-        {
-            if (obstacle == position)
-                return true;
-        }
+            if (obstacle == position) return true;
         return false;
     }
 
@@ -119,9 +100,6 @@ public class BotiRobotController : MonoBehaviour
         transform.position = new Vector3(gridPosition.x, 0.8f, gridPosition.y);
     }
 
-    /// <summary>
-    /// Reset robot to initial position.
-    /// </summary>
     public void ResetRobot()
     {
         gridPosition = startPosition;

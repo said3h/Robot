@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
@@ -9,34 +10,52 @@ public static class BotiSceneBuilder
     [MenuItem("Boti/Build Scene")]
     public static void BuildScene()
     {
-        Debug.Log("BOTI BUILDER EJECUTADO");
-
         Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         CreateCamera();
         CreateLight();
-        CreateTestGrid();
-        CreateControlPanel();
+        CreateWorld();
+        CreateBoti();
+        CreateEventSystem();
 
         if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
             AssetDatabase.CreateFolder("Assets", "Scenes");
 
         EditorSceneManager.SaveScene(scene, "Assets/Scenes/BotiGame.unity");
 
-        EditorUtility.DisplayDialog("Boti", "Escena creada correctamente.", "OK");
+        EditorUtility.DisplayDialog("Boti", "Exploration sandbox created!", "OK");
+    }
+
+    static void CreateEventSystem()
+    {
+        // Remove any existing EventSystems first
+        EventSystem[] existingEventSystems = Object.FindObjectsOfType<EventSystem>();
+        foreach (EventSystem es in existingEventSystems)
+        {
+            Object.DestroyImmediate(es.gameObject);
+        }
+        
+        GameObject eventSystemObj = new GameObject("EventSystem");
+        eventSystemObj.AddComponent<EventSystem>();
+        eventSystemObj.AddComponent<StandaloneInputModule>();
     }
 
     static void CreateCamera()
     {
-        GameObject camObj = new GameObject("Main Camera");
+        // Main camera with top-down view
+        GameObject camObj = new GameObject("MainCamera");
         Camera cam = camObj.AddComponent<Camera>();
         camObj.tag = "MainCamera";
-
-        cam.transform.position = new Vector3(0, 12, 0);
-        cam.transform.rotation = Quaternion.Euler(90, 0, 0);
+        cam.transform.position = new Vector3(0, 20, -5);
+        cam.transform.rotation = Quaternion.Euler(60, 0, 0);
         cam.orthographic = true;
-        cam.orthographicSize = 8;
-        cam.backgroundColor = new Color(0.12f, 0.12f, 0.12f);
+        cam.orthographicSize = 12;
+        cam.backgroundColor = new Color(0.4f, 0.6f, 0.8f); // Sky blue
+        
+        // Add camera follow script
+        CameraFollow camFollow = camObj.AddComponent<CameraFollow>();
+        camFollow.offset = new Vector3(0, 20, -5);
+        camFollow.smoothSpeed = 3f;
     }
 
     static void CreateLight()
@@ -44,20 +63,15 @@ public static class BotiSceneBuilder
         GameObject lightObj = new GameObject("Directional Light");
         Light light = lightObj.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.intensity = 1.2f;
+        light.intensity = 1.0f;
         lightObj.transform.rotation = Quaternion.Euler(50, -30, 0);
     }
 
     static Material Mat(Color color)
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-
-        if (shader == null)
-            shader = Shader.Find("Universal Render Pipeline/Unlit");
-
-        if (shader == null)
-            shader = Shader.Find("Sprites/Default");
-
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
         Material mat = new Material(shader);
         mat.color = color;
         return mat;
@@ -66,221 +80,173 @@ public static class BotiSceneBuilder
     static void Paint(GameObject obj, Material mat)
     {
         Renderer renderer = obj.GetComponent<Renderer>();
-        if (renderer != null)
-            renderer.sharedMaterial = mat;
+        if (renderer != null) renderer.sharedMaterial = mat;
     }
 
-    static void CreateTestGrid()
+    static void CreateWorld()
     {
-        Material tileMat = Mat(new Color(0.45f, 0.55f, 0.65f));
-        Material robotMat = Mat(Color.cyan);
-        Material goalMat = Mat(Color.green);
-        Material obstacleMat = Mat(Color.red);
-
-        GameObject gridParent = new GameObject("Grid");
-
-        for (int x = -3; x <= 3; x++)
+        // Materials for different terrain types
+        Material grassMat = Mat(new Color(0.3f, 0.6f, 0.25f));      // Green grass
+        Material stoneMat = Mat(new Color(0.5f, 0.5f, 0.55f));    // Gray stone
+        Material waterMat = Mat(new Color(0.2f, 0.4f, 0.7f));     // Blue water
+        Material pathMat = Mat(new Color(0.65f, 0.5f, 0.35f));   // Dirt path
+        Material darkGrassMat = Mat(new Color(0.25f, 0.5f, 0.2f)); // Dark grass
+        
+        // Create larger world grid (20x20 tiles)
+        int worldSize = 10;
+        GameObject terrainParent = new GameObject("Terrain");
+        
+        for (int x = -worldSize; x <= worldSize; x++)
         {
-            for (int z = -3; z <= 3; z++)
+            for (int z = -worldSize; z <= worldSize; z++)
             {
                 GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 tile.name = "Tile";
-                tile.transform.parent = gridParent.transform;
+                tile.transform.parent = terrainParent.transform;
                 tile.transform.position = new Vector3(x, 0, z);
-                tile.transform.localScale = new Vector3(0.9f, 0.1f, 0.9f);
-                Paint(tile, tileMat);
+                tile.transform.localScale = new Vector3(0.95f, 0.15f, 0.95f);
+                
+                // Add variety to terrain
+                float noise = Mathf.PerlinNoise(x * 0.2f, z * 0.2f);
+                
+                if (noise < 0.2f)
+                {
+                    Paint(tile, waterMat);
+                    tile.transform.localScale = new Vector3(0.95f, 0.3f, 0.95f);
+                }
+                else if (noise < 0.3f)
+                {
+                    Paint(tile, pathMat);
+                }
+                else if (noise < 0.5f)
+                {
+                    Paint(tile, stoneMat);
+                }
+                else if (noise < 0.7f)
+                {
+                    Paint(tile, darkGrassMat);
+                }
+                else
+                {
+                    Paint(tile, grassMat);
+                }
             }
         }
+        
+        // Add decorative objects
+        CreateDecorations();
+    }
 
-        GameObject robot = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        robot.name = "Robot";
-        robot.transform.position = new Vector3(-3, 0.8f, -3);
-        Paint(robot, robotMat);
-
-        // Add BotiRobotController for grid-based movement
-        robot.AddComponent<BotiRobotController>();
-
-        GameObject goal = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        goal.name = "Goal";
-        goal.transform.position = new Vector3(3, 0.6f, 3);
-        Paint(goal, goalMat);
-
-        Vector3[] obstacles =
+    static void CreateDecorations()
+    {
+        // Materials for decorations
+        Material rockMat = Mat(new Color(0.6f, 0.6f, 0.65f));
+        Material treeMat = Mat(new Color(0.3f, 0.5f, 0.2f));
+        Material trunkMat = Mat(new Color(0.4f, 0.25f, 0.15f));
+        Material junkMat = Mat(new Color(0.5f, 0.5f, 0.6f));
+        Material crystalMat = Mat(new Color(0.6f, 0.2f, 0.8f)); // Purple crystal
+        
+        System.Random rng = new System.Random(42); // Deterministic placement
+        
+        // Scatter rocks
+        for (int i = 0; i < 25; i++)
         {
-            new Vector3(0, 0.6f, 0),
-            new Vector3(1, 0.6f, 0),
-            new Vector3(-1, 0.6f, 1),
-            new Vector3(2, 0.6f, -1)
-        };
-
-        foreach (Vector3 pos in obstacles)
-        {
-            GameObject obstacle = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            obstacle.name = "Obstacle";
-            obstacle.transform.position = pos;
-            obstacle.transform.localScale = new Vector3(0.8f, 1f, 0.8f);
-            Paint(obstacle, obstacleMat);
+            int x = rng.Next(-8, 9);
+            int z = rng.Next(-8, 9);
+            float scale = (float)(rng.NextDouble() * 0.5 + 0.5);
+            
+            GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            rock.name = "Rock";
+            rock.transform.position = new Vector3(x, scale * 0.4f, z);
+            rock.transform.localScale = new Vector3(scale, scale * 0.6f, scale);
+            Paint(rock, rockMat);
         }
-
-        // Create CommandQueue object
-        GameObject commandQueueObj = new GameObject("CommandQueue");
-        BotiCommandQueue cmdQueue = commandQueueObj.AddComponent<BotiCommandQueue>();
-        cmdQueue.robotController = robot.GetComponent<BotiRobotController>();
-    }
-
-    static void CreateControlPanel()
-    {
-        // Create Canvas for UI
-        GameObject canvasObj = new GameObject("ControlPanel");
-        canvasObj.AddComponent<Canvas>();
-        canvasObj.AddComponent<CanvasScaler>();
-        canvasObj.AddComponent<GraphicRaycaster>();
-
-        // Make Canvas render in Screen Space Overlay
-        Canvas canvas = canvasObj.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.pixelPerfect = true;
-
-        // Find CommandQueue
-        BotiCommandQueue cmdQueue = GameObject.Find("CommandQueue")?.GetComponent<BotiCommandQueue>();
-
-        if (cmdQueue == null)
+        
+        // Scatter trees
+        for (int i = 0; i < 15; i++)
         {
-            Debug.LogWarning("CommandQueue not found - UI buttons will not be linked");
-            return;
+            int x = rng.Next(-8, 9);
+            int z = rng.Next(-8, 9);
+            
+            // Check if position is near center (spawn area)
+            if (Mathf.Abs(x) < 2 && Mathf.Abs(z) < 2) continue;
+            
+            float height = (float)(rng.NextDouble() * 1.5 + 1.5);
+            
+            // Trunk
+            GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            trunk.name = "TreeTrunk";
+            trunk.transform.position = new Vector3(x, height * 0.4f, z);
+            trunk.transform.localScale = new Vector3(0.15f, height * 0.4f, 0.15f);
+            Paint(trunk, trunkMat);
+            
+            // Foliage (sphere)
+            GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            foliage.name = "TreeFoliage";
+            foliage.transform.position = new Vector3(x, height * 0.8f + 0.5f, z);
+            foliage.transform.localScale = new Vector3(height * 0.8f, height * 0.6f, height * 0.8f);
+            Paint(foliage, treeMat);
         }
-
-        // Create button style
-        GameObject buttonPrefab = CreateButtonPrefab();
-
-        // === Bottom Panel Background ===
-        GameObject bottomPanel = new GameObject("BottomPanel");
-        bottomPanel.transform.parent = canvasObj.transform;
-        Image panelBg = bottomPanel.AddComponent<Image>();
-        panelBg.color = new Color(0.08f, 0.08f, 0.12f, 0.98f);
-        RectTransform panelRect = bottomPanel.GetComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0, 0);
-        panelRect.anchorMax = new Vector2(1, 0);
-        panelRect.sizeDelta = new Vector2(0, 260);
-        panelRect.anchoredPosition = new Vector2(0, 130);
-
-        // === Command Queue Display ===
-        GameObject queueTextObj = new GameObject("QueueDisplay");
-        queueTextObj.transform.parent = bottomPanel.transform;
-        Text queueText = queueTextObj.AddComponent<Text>();
-        queueText.text = "Commands: (empty)";
-        queueText.fontSize = 22;
-        queueText.color = new Color(0.7f, 0.9f, 0.7f);
-        queueText.alignment = TextAnchor.MiddleCenter;
-        queueText.fontStyle = FontStyle.Bold;
-        RectTransform queueRect = queueTextObj.GetComponent<RectTransform>();
-        queueRect.anchorMin = new Vector2(0.1f, 0.75f);
-        queueRect.anchorMax = new Vector2(0.9f, 1f);
-        queueRect.sizeDelta = new Vector2(0, 40);
-        queueRect.anchoredPosition = new Vector2(0, 0);
-
-        // Subscribe to command changes to update display
-        cmdQueue.OnCommandsChanged += () =>
+        
+        // Scatter robot junk/scrap
+        for (int i = 0; i < 10; i++)
         {
-            string display = cmdQueue.GetCommandsDisplay();
-            queueText.text = "Commands: " + (display == "(empty)" ? "(empty)" : display);
-        };
-
-        // === Direction Buttons - D-Pad Layout ===
-        float dpadSize = 70;
-
-        // Up button (center top)
-        CreateButton(bottomPanel.transform, buttonPrefab, "Up", 0.25f, 0.45f, dpadSize, dpadSize,
-            () => cmdQueue.AddMoveUp());
-
-        // Left button (left middle)
-        CreateButton(bottomPanel.transform, buttonPrefab, "Left", 0.17f, 0.2f, dpadSize, dpadSize,
-            () => cmdQueue.AddMoveLeft());
-
-        // Down button (center bottom)
-        CreateButton(bottomPanel.transform, buttonPrefab, "Down", 0.25f, 0.2f, dpadSize, dpadSize,
-            () => cmdQueue.AddMoveDown());
-
-        // Right button (right middle)
-        CreateButton(bottomPanel.transform, buttonPrefab, "Right", 0.33f, 0.2f, dpadSize, dpadSize,
-            () => cmdQueue.AddMoveRight());
-
-        // === Action Buttons (right side) ===
-        CreateButton(bottomPanel.transform, buttonPrefab, "Run", 0.68f, 0.45f, 90, 50,
-            () => cmdQueue.RunCommands());
-
-        CreateButton(bottomPanel.transform, buttonPrefab, "Clear", 0.83f, 0.45f, 90, 50,
-            () => cmdQueue.ClearCommands());
-
-        CreateButton(bottomPanel.transform, buttonPrefab, "Reset", 0.68f, 0.2f, 90, 50,
-            () => cmdQueue.ResetLevel());
+            int x = rng.Next(-9, 10);
+            int z = rng.Next(-9, 10);
+            
+            GameObject junk = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            junk.name = "RobotJunk";
+            junk.transform.position = new Vector3(x, 0.2f, z);
+            junk.transform.rotation = Quaternion.Euler(0, rng.Next(0, 360), 0);
+            junk.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+            Paint(junk, junkMat);
+        }
+        
+        // Scatter crystals
+        for (int i = 0; i < 8; i++)
+        {
+            int x = rng.Next(-8, 9);
+            int z = rng.Next(-8, 9);
+            
+            GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            crystal.name = "Crystal";
+            crystal.transform.position = new Vector3(x, 0.4f, z);
+            crystal.transform.localScale = new Vector3(0.15f, 0.8f, 0.15f);
+            Paint(crystal, crystalMat);
+        }
+        
+        Debug.Log("=== WORLD DECORATIONS CREATED ===");
     }
 
-    static GameObject CreateButtonPrefab()
+    static void CreateBoti()
     {
-        // Create a simple button using Unity UI
-        GameObject buttonObj = new GameObject("Button");
-        buttonObj.SetActive(false);
-
-        // Add Text for label
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.parent = buttonObj.transform;
-        textObj.AddComponent<Text>().text = "Button";
-        textObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
-        textObj.GetComponent<Text>().color = Color.white;
-        textObj.GetComponent<Text>().fontSize = 22;
-        textObj.GetComponent<Text>().fontStyle = FontStyle.Bold;
-
-        // Set Text to fill parent
-        textObj.GetComponent<RectTransform>().anchorMin = Vector2.zero;
-        textObj.GetComponent<RectTransform>().anchorMax = Vector2.one;
-        textObj.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
-
-        // Add Image for background
-        Image img = buttonObj.AddComponent<Image>();
-        img.color = new Color(0.25f, 0.35f, 0.45f, 0.95f);
-
-        // Add Button component
-        Button btn = buttonObj.AddComponent<Button>();
-        ColorBlock colors = btn.colors;
-        colors.highlightedColor = new Color(0.35f, 0.5f, 0.65f);
-        colors.pressedColor = new Color(0.15f, 0.25f, 0.35f);
-        btn.colors = colors;
-
-        return buttonObj;
-    }
-
-    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 anchorMin, Vector2 anchorMax, float width, float height, UnityEngine.Events.UnityAction callback)
-    {
-        GameObject button = Object.Instantiate(prefab);
-        button.SetActive(true);
-        button.name = label + "Button";
-        button.transform.parent = parent;
-
-        // Set label text
-        button.transform.GetChild(0).GetComponent<Text>().text = label;
-
-        // Set position and size using anchor-based positioning
-        RectTransform rect = button.GetComponent<RectTransform>();
-        rect.anchorMin = anchorMin;
-        rect.anchorMax = anchorMax;
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(width, height);
-        rect.anchoredPosition = Vector2.zero;
-
-        // Add click listener
-        button.GetComponent<Button>().onClick.AddListener(callback);
-    }
-
-    // New overload: x, y as separate floats for anchorMin/anchorMax
-    static void CreateButton(Transform parent, GameObject prefab, string label, float anchorX, float anchorY, float width, float height, UnityEngine.Events.UnityAction callback)
-    {
-        CreateButton(parent, prefab, label, new Vector2(anchorX, anchorY), new Vector2(anchorX, anchorY), width, height, callback);
-    }
-
-    // Keep old signature for compatibility
-    static void CreateButton(Transform parent, GameObject prefab, string label, Vector2 anchoredPosition, UnityEngine.Events.UnityAction callback)
-    {
-        CreateButton(parent, prefab, label, anchoredPosition, anchoredPosition, 70, 50, callback);
+        // Create Boti robot player
+        GameObject boti = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        boti.name = "Boti";
+        boti.transform.position = new Vector3(0, 0.6f, 0);
+        
+        // Material - bright cyan for visibility
+        Material botiMat = Mat(new Color(0.2f, 0.9f, 0.9f));
+        Paint(boti, botiMat);
+        
+        // Add player controller
+        BotiPlayerController playerCtrl = boti.AddComponent<BotiPlayerController>();
+        playerCtrl.moveSpeed = 6f;
+        playerCtrl.gridSize = 1f;
+        
+        // Find camera and assign target
+        Camera cam = Object.FindObjectOfType<Camera>();
+        if (cam != null)
+        {
+            CameraFollow camFollow = cam.GetComponent<CameraFollow>();
+            if (camFollow != null)
+            {
+                camFollow.SetTarget(boti.transform);
+                camFollow.SnapToTarget();
+            }
+        }
+        
+        Debug.Log("=== BOTI ROBOT CREATED ===");
+        Debug.Log("Use WASD or Arrow keys to move!");
     }
 }
