@@ -18,6 +18,7 @@ public class BotiPlayerController : MonoBehaviour
 
     [Header("References")]
     public Camera mainCamera;
+    public BotiInventory inventory;
 
     // Movement state
     private Vector3 targetPosition;
@@ -33,6 +34,9 @@ public class BotiPlayerController : MonoBehaviour
 
         if (mainCamera == null)
             mainCamera = Camera.main;
+
+        if (inventory != null)
+            inventory.UpdateUI();
 
         if (interactionPromptText != null)
             interactionPromptText.gameObject.SetActive(false);
@@ -90,6 +94,9 @@ public class BotiPlayerController : MonoBehaviour
         if (keyboard.eKey.wasPressedThisFrame && nearbyInteractable != null)
         {
             nearbyInteractable.Interact();
+            nearbyInteractable = null;
+            if (interactionPromptText != null)
+                interactionPromptText.gameObject.SetActive(false);
         }
     }
 

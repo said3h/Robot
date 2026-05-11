@@ -17,6 +17,7 @@ public class Interactable : MonoBehaviour
 {
     public InteractableType type;
     public string interactionPrompt = "Press E";
+    public BotiInventory inventory;
 
     public string GetInteractionMessage()
     {
@@ -38,10 +39,16 @@ public class Interactable : MonoBehaviour
         switch (type)
         {
             case InteractableType.Scrap:
+                if (inventory != null)
+                    inventory.AddScrap(1);
                 Debug.Log("Collected scrap");
+                Destroy(gameObject);
                 break;
             case InteractableType.Crystal:
+                if (inventory != null)
+                    inventory.AddCrystal(1);
                 Debug.Log("Collected crystal");
+                Destroy(gameObject);
                 break;
             case InteractableType.Tree:
                 Debug.Log("This tree looks old");

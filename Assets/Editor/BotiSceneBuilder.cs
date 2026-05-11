@@ -216,6 +216,45 @@ public static class BotiSceneBuilder
 
     static void CreateUI()
     {
+        // Inventory Canvas
+        GameObject inventoryCanvasObj = new GameObject("InventoryCanvas");
+        Canvas inventoryCanvas = inventoryCanvasObj.AddComponent<Canvas>();
+        inventoryCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        inventoryCanvas.sortingOrder = 100;
+        inventoryCanvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
+        inventoryCanvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+        // Scrap text
+        GameObject scrapTextObj = new GameObject("ScrapText");
+        scrapTextObj.transform.SetParent(inventoryCanvasObj.transform);
+        RectTransform scrapRect = scrapTextObj.AddComponent<RectTransform>();
+        scrapRect.anchorMin = new Vector2(0f, 1f);
+        scrapRect.anchorMax = new Vector2(0f, 1f);
+        scrapRect.pivot = new Vector2(0f, 1f);
+        scrapRect.anchoredPosition = new Vector2(20, -20);
+        scrapRect.sizeDelta = new Vector2(200, 40);
+
+        Text scrapText = scrapTextObj.AddComponent<Text>();
+        scrapText.text = "Scrap: 0";
+        scrapText.fontSize = 24;
+        scrapText.color = Color.white;
+
+        // Crystal text
+        GameObject crystalTextObj = new GameObject("CrystalText");
+        crystalTextObj.transform.SetParent(inventoryCanvasObj.transform);
+        RectTransform crystalRect = crystalTextObj.AddComponent<RectTransform>();
+        crystalRect.anchorMin = new Vector2(0f, 1f);
+        crystalRect.anchorMax = new Vector2(0f, 1f);
+        crystalRect.pivot = new Vector2(0f, 1f);
+        crystalRect.anchoredPosition = new Vector2(20, -60);
+        crystalRect.sizeDelta = new Vector2(200, 40);
+
+        Text crystalText = crystalTextObj.AddComponent<Text>();
+        crystalText.text = "Crystal: 0";
+        crystalText.fontSize = 24;
+        crystalText.color = Color.white;
+
+        // Interaction Canvas
         GameObject canvasObj = new GameObject("InteractionCanvas");
         Canvas canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -223,6 +262,7 @@ public static class BotiSceneBuilder
         canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
         canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
+        // Interaction Prompt Text
         GameObject textObj = new GameObject("InteractionPrompt");
         textObj.transform.SetParent(canvasObj.transform);
 
@@ -258,10 +298,26 @@ public static class BotiSceneBuilder
         playerCtrl.gridSize = 1f;
         playerCtrl.interactionRange = 3f;
 
-        UnityEngine.UI.Text promptText = Object.FindObjectOfType<UnityEngine.UI.Text>();
-        if (promptText != null)
+        // Add inventory
+        BotiInventory inventory = boti.AddComponent<BotiInventory>();
+
+        // Wire up inventory UI texts
+        Text scrapText = GameObject.Find("ScrapText").GetComponent<Text>();
+        Text crystalText = GameObject.Find("CrystalText").GetComponent<Text>();
+        inventory.scrapText = scrapText;
+        inventory.crystalText = crystalText;
+        inventory.UpdateUI();
+
+        // Wire up interaction prompt
+        UnityEngine.UI.Text promptText = GameObject.Find("InteractionPrompt").GetComponent<UnityEngine.UI.Text>();
+        playerCtrl.interactionPromptText = promptText;
+        playerCtrl.inventory = inventory;
+
+        // Wire up inventory reference to all Interactables
+        Interactable[] interactables = Object.FindObjectsOfType<Interactable>();
+        foreach (Interactable inter in interactables)
         {
-            playerCtrl.interactionPromptText = promptText;
+            inter.inventory = inventory;
         }
 
         Camera cam = Object.FindObjectOfType<Camera>();
