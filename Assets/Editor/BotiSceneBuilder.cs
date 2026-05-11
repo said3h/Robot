@@ -15,6 +15,7 @@ public static class BotiSceneBuilder
         CreateCamera();
         CreateLight();
         CreateWorld();
+        CreateUI();
         CreateBoti();
         CreateEventSystem();
 
@@ -28,7 +29,6 @@ public static class BotiSceneBuilder
 
     static void CreateEventSystem()
     {
-        // Remove any existing EventSystems first
         EventSystem[] existingEventSystems = Object.FindObjectsOfType<EventSystem>();
         foreach (EventSystem es in existingEventSystems)
         {
@@ -37,15 +37,11 @@ public static class BotiSceneBuilder
 
         GameObject eventSystemObj = new GameObject("EventSystem");
         eventSystemObj.AddComponent<EventSystem>();
-
-        // Use InputSystemUIInputModule instead of StandaloneInputModule
-        // to avoid legacy Input.GetButton errors
         eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
     }
 
     static void CreateCamera()
     {
-        // Main camera with top-down view
         GameObject camObj = new GameObject("MainCamera");
         Camera cam = camObj.AddComponent<Camera>();
         camObj.tag = "MainCamera";
@@ -53,9 +49,8 @@ public static class BotiSceneBuilder
         cam.transform.rotation = Quaternion.Euler(60, 0, 0);
         cam.orthographic = true;
         cam.orthographicSize = 12;
-        cam.backgroundColor = new Color(0.4f, 0.6f, 0.8f); // Sky blue
-        
-        // Add camera follow script
+        cam.backgroundColor = new Color(0.4f, 0.6f, 0.8f);
+
         CameraFollow camFollow = camObj.AddComponent<CameraFollow>();
         camFollow.offset = new Vector3(0, 20, -5);
         camFollow.smoothSpeed = 3f;
@@ -88,17 +83,15 @@ public static class BotiSceneBuilder
 
     static void CreateWorld()
     {
-        // Materials for different terrain types
-        Material grassMat = Mat(new Color(0.3f, 0.6f, 0.25f));      // Green grass
-        Material stoneMat = Mat(new Color(0.5f, 0.5f, 0.55f));    // Gray stone
-        Material waterMat = Mat(new Color(0.2f, 0.4f, 0.7f));     // Blue water
-        Material pathMat = Mat(new Color(0.65f, 0.5f, 0.35f));   // Dirt path
-        Material darkGrassMat = Mat(new Color(0.25f, 0.5f, 0.2f)); // Dark grass
-        
-        // Create larger world grid (20x20 tiles)
+        Material grassMat = Mat(new Color(0.3f, 0.6f, 0.25f));
+        Material stoneMat = Mat(new Color(0.5f, 0.5f, 0.55f));
+        Material waterMat = Mat(new Color(0.2f, 0.4f, 0.7f));
+        Material pathMat = Mat(new Color(0.65f, 0.5f, 0.35f));
+        Material darkGrassMat = Mat(new Color(0.25f, 0.5f, 0.2f));
+
         int worldSize = 10;
         GameObject terrainParent = new GameObject("Terrain");
-        
+
         for (int x = -worldSize; x <= worldSize; x++)
         {
             for (int z = -worldSize; z <= worldSize; z++)
@@ -108,10 +101,9 @@ public static class BotiSceneBuilder
                 tile.transform.parent = terrainParent.transform;
                 tile.transform.position = new Vector3(x, 0, z);
                 tile.transform.localScale = new Vector3(0.95f, 0.15f, 0.95f);
-                
-                // Add variety to terrain
+
                 float noise = Mathf.PerlinNoise(x * 0.2f, z * 0.2f);
-                
+
                 if (noise < 0.2f)
                 {
                     Paint(tile, waterMat);
@@ -135,109 +127,143 @@ public static class BotiSceneBuilder
                 }
             }
         }
-        
-        // Add decorative objects
+
         CreateDecorations();
     }
 
     static void CreateDecorations()
     {
-        // Materials for decorations
         Material rockMat = Mat(new Color(0.6f, 0.6f, 0.65f));
         Material treeMat = Mat(new Color(0.3f, 0.5f, 0.2f));
         Material trunkMat = Mat(new Color(0.4f, 0.25f, 0.15f));
         Material junkMat = Mat(new Color(0.5f, 0.5f, 0.6f));
-        Material crystalMat = Mat(new Color(0.6f, 0.2f, 0.8f)); // Purple crystal
-        
-        System.Random rng = new System.Random(42); // Deterministic placement
-        
-        // Scatter rocks
+        Material crystalMat = Mat(new Color(0.6f, 0.2f, 0.8f));
+
+        System.Random rng = new System.Random(42);
+
         for (int i = 0; i < 25; i++)
         {
             int x = rng.Next(-8, 9);
             int z = rng.Next(-8, 9);
             float scale = (float)(rng.NextDouble() * 0.5 + 0.5);
-            
+
             GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             rock.name = "Rock";
             rock.transform.position = new Vector3(x, scale * 0.4f, z);
             rock.transform.localScale = new Vector3(scale, scale * 0.6f, scale);
             Paint(rock, rockMat);
         }
-        
-        // Scatter trees
+
         for (int i = 0; i < 15; i++)
         {
             int x = rng.Next(-8, 9);
             int z = rng.Next(-8, 9);
-            
-            // Check if position is near center (spawn area)
+
             if (Mathf.Abs(x) < 2 && Mathf.Abs(z) < 2) continue;
-            
+
             float height = (float)(rng.NextDouble() * 1.5 + 1.5);
-            
-            // Trunk
+
             GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             trunk.name = "TreeTrunk";
             trunk.transform.position = new Vector3(x, height * 0.4f, z);
             trunk.transform.localScale = new Vector3(0.15f, height * 0.4f, 0.15f);
             Paint(trunk, trunkMat);
-            
-            // Foliage (sphere)
+
+            Interactable treeInteractable = trunk.AddComponent<Interactable>();
+            treeInteractable.type = InteractableType.Tree;
+
             GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             foliage.name = "TreeFoliage";
             foliage.transform.position = new Vector3(x, height * 0.8f + 0.5f, z);
             foliage.transform.localScale = new Vector3(height * 0.8f, height * 0.6f, height * 0.8f);
             Paint(foliage, treeMat);
+
+            Interactable foliageInteractable = foliage.AddComponent<Interactable>();
+            foliageInteractable.type = InteractableType.Tree;
         }
-        
-        // Scatter robot junk/scrap
+
         for (int i = 0; i < 10; i++)
         {
             int x = rng.Next(-9, 10);
             int z = rng.Next(-9, 10);
-            
+
             GameObject junk = GameObject.CreatePrimitive(PrimitiveType.Cube);
             junk.name = "RobotJunk";
             junk.transform.position = new Vector3(x, 0.2f, z);
             junk.transform.rotation = Quaternion.Euler(0, rng.Next(0, 360), 0);
             junk.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
             Paint(junk, junkMat);
+
+            Interactable scrapInteractable = junk.AddComponent<Interactable>();
+            scrapInteractable.type = InteractableType.Scrap;
         }
-        
-        // Scatter crystals
+
         for (int i = 0; i < 8; i++)
         {
             int x = rng.Next(-8, 9);
             int z = rng.Next(-8, 9);
-            
+
             GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             crystal.name = "Crystal";
             crystal.transform.position = new Vector3(x, 0.4f, z);
             crystal.transform.localScale = new Vector3(0.15f, 0.8f, 0.15f);
             Paint(crystal, crystalMat);
+
+            Interactable crystalInteractable = crystal.AddComponent<Interactable>();
+            crystalInteractable.type = InteractableType.Crystal;
         }
-        
-        Debug.Log("=== WORLD DECORATIONS CREATED ===");
+    }
+
+    static void CreateUI()
+    {
+        GameObject canvasObj = new GameObject("InteractionCanvas");
+        Canvas canvas = canvasObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100;
+        canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
+        canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+        GameObject textObj = new GameObject("InteractionPrompt");
+        textObj.transform.SetParent(canvasObj.transform);
+
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = new Vector2(0.5f, 0f);
+        textRect.anchorMax = new Vector2(0.5f, 0f);
+        textRect.pivot = new Vector2(0.5f, 0f);
+        textRect.anchoredPosition = new Vector2(0, 40);
+        textRect.sizeDelta = new Vector2(800, 80);
+
+        UnityEngine.UI.Text promptText = textObj.AddComponent<UnityEngine.UI.Text>();
+        promptText.text = "";
+        promptText.fontSize = 32;
+        promptText.color = Color.white;
+        promptText.alignment = TextAnchor.MiddleCenter;
+
+        UnityEngine.UI.Outline outline = textObj.AddComponent<UnityEngine.UI.Outline>();
+        outline.effectColor = new Color(0, 0, 0, 0.5f);
+        outline.effectDistance = new Vector2(2, -2);
     }
 
     static void CreateBoti()
     {
-        // Create Boti robot player
         GameObject boti = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         boti.name = "Boti";
         boti.transform.position = new Vector3(0, 0.6f, 0);
-        
-        // Material - bright cyan for visibility
+
         Material botiMat = Mat(new Color(0.2f, 0.9f, 0.9f));
         Paint(boti, botiMat);
-        
-        // Add player controller
+
         BotiPlayerController playerCtrl = boti.AddComponent<BotiPlayerController>();
         playerCtrl.moveSpeed = 6f;
         playerCtrl.gridSize = 1f;
-        
-        // Find camera and assign target
+        playerCtrl.interactionRange = 3f;
+
+        UnityEngine.UI.Text promptText = Object.FindObjectOfType<UnityEngine.UI.Text>();
+        if (promptText != null)
+        {
+            playerCtrl.interactionPromptText = promptText;
+        }
+
         Camera cam = Object.FindObjectOfType<Camera>();
         if (cam != null)
         {
@@ -248,8 +274,5 @@ public static class BotiSceneBuilder
                 camFollow.SnapToTarget();
             }
         }
-        
-        Debug.Log("=== BOTI ROBOT CREATED ===");
-        Debug.Log("Use WASD or Arrow keys to move!");
     }
 }
