@@ -1,64 +1,105 @@
 using UnityEngine;
 
 /// <summary>
-/// Simple camera follow script for smooth tracking of the Boti robot.
+/// Fixed top-down camera helper.
+/// Keeps the camera still so player movement does not feel dizzy.
 /// </summary>
+[RequireComponent(typeof(Camera))]
+[RequireComponent(typeof(AudioListener))]
 public class CameraFollow : MonoBehaviour
 {
-    [Header("Target")]
-    public Transform target;
-    
-    [Header("Follow Settings")]
-    public float smoothSpeed = 5f;
-    public Vector3 offset = new Vector3(0, 15, 0);
-    public bool lookAtTarget = true;
-    
+    [Header("Fixed Camera Settings")]
+    public Vector3 fixedPosition = new Vector3(0, 26, -18);
+    public Vector3 fixedRotation = new Vector3(60, 0, 0);
+    public float orthographicSize = 15;
+
+    void Awake()
+    {
+        EnsureSingleMainCamera();
+        EnsureAudioListener();
+    }
+
     void Start()
     {
-        // Find robot if not assigned
-        if (target == null)
-        {
-            GameObject boti = GameObject.Find("Boti");
-            if (boti != null)
-            {
-                target = boti.transform;
-            }
-        }
+        ApplyFixedCamera();
     }
-    
+
     void LateUpdate()
     {
-        if (target == null) return;
-        
-        // Calculate desired camera position
-        Vector3 desiredPosition = target.position + offset;
-        
-        // Smoothly move camera
-        transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed * Time.deltaTime);
-        
-        // Look at target if enabled
-        if (lookAtTarget)
+        ApplyFixedCamera();
+    }
+
+    public void ApplyFixedCamera()
+    {
+        transform.SetParent(null);
+        gameObject.name = "MainCamera";
+        gameObject.tag = "MainCamera";
+        transform.position = fixedPosition;
+        transform.rotation = Quaternion.Euler(fixedRotation);
+
+        Camera cam = GetComponent<Camera>();
+        if (cam != null)
         {
-            transform.LookAt(target);
+            cam.orthographic = true;
+            cam.orthographicSize = orthographicSize;
+        }
+
+        EnsureAudioListener();
+    }
+
+    private void EnsureSingleMainCamera()
+    {
+        Camera[] cameras = FindObjectsOfType<Camera>();
+        foreach (Camera cam in cameras)
+        {
+            if (cam == null || cam.gameObject == gameObject)
+                continue;
+
+            Debug.LogWarning("Boti camera guard removed duplicate camera: " + cam.gameObject.name);
+            DestroySafely(cam.gameObject);
         }
     }
-    
+
+    private void EnsureAudioListener()
+    {
+        AudioListener[] listeners = FindObjectsOfType<AudioListener>();
+        foreach (AudioListener listener in listeners)
+        {
+            if (listener == null || listener.gameObject == gameObject)
+                continue;
+
+            Debug.LogWarning("Boti camera guard removed duplicate AudioListener from: " + listener.gameObject.name);
+            DestroySafely(listener);
+        }
+
+        if (GetComponent<AudioListener>() == null)
+        {
+            gameObject.AddComponent<AudioListener>();
+            Debug.Log("Boti camera guard added AudioListener to MainCamera.");
+        }
+    }
+
+    private void DestroySafely(Object obj)
+    {
+        if (Application.isPlaying)
+            Destroy(obj);
+        else
+            DestroyImmediate(obj);
+    }
+
     /// <summary>
-    /// Set the target to follow
+    /// Kept for compatibility with older setup code.
     /// </summary>
     public void SetTarget(Transform newTarget)
     {
-        target = newTarget;
+        ApplyFixedCamera();
     }
-    
+
     /// <summary>
-    /// Snap camera to target immediately
+    /// Kept for compatibility with older setup code.
     /// </summary>
     public void SnapToTarget()
     {
-        if (target != null)
-        {
-            transform.position = target.position + offset;
-        }
+        ApplyFixedCamera();
     }
 }

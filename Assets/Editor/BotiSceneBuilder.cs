@@ -42,18 +42,39 @@ public static class BotiSceneBuilder
 
     static void CreateCamera()
     {
+        RemoveExistingCameras();
+
         GameObject camObj = new GameObject("MainCamera");
         Camera cam = camObj.AddComponent<Camera>();
+        camObj.AddComponent<AudioListener>();
         camObj.tag = "MainCamera";
-        cam.transform.position = new Vector3(0, 20, -5);
+        camObj.transform.parent = null;
+        cam.transform.position = new Vector3(0, 26, -18);
         cam.transform.rotation = Quaternion.Euler(60, 0, 0);
         cam.orthographic = true;
-        cam.orthographicSize = 12;
+        cam.orthographicSize = 15;
         cam.backgroundColor = new Color(0.4f, 0.6f, 0.8f);
 
         CameraFollow camFollow = camObj.AddComponent<CameraFollow>();
-        camFollow.offset = new Vector3(0, 20, -5);
-        camFollow.smoothSpeed = 3f;
+        camFollow.fixedPosition = new Vector3(0, 26, -18);
+        camFollow.fixedRotation = new Vector3(60, 0, 0);
+        camFollow.orthographicSize = 15;
+        camFollow.ApplyFixedCamera();
+
+        Debug.Log("BotiSceneBuilder created fixed RTS MainCamera with AudioListener.");
+    }
+
+    static void RemoveExistingCameras()
+    {
+        Camera[] cameras = Object.FindObjectsOfType<Camera>();
+        foreach (Camera camera in cameras)
+        {
+            if (camera != null)
+            {
+                Debug.LogWarning("BotiSceneBuilder removed duplicate camera before creating MainCamera: " + camera.gameObject.name);
+                Object.DestroyImmediate(camera.gameObject);
+            }
+        }
     }
 
     static void CreateLight()
@@ -83,135 +104,261 @@ public static class BotiSceneBuilder
 
     static void CreateWorld()
     {
+        int worldSize = 10;
+        WorldState worldState = CreateWorldState(worldSize);
+        GridManager gridManager = CreateGridManager(worldSize);
+
+        GenerateWorldData(worldState);
+        gridManager.ApplyWorldState(worldState);
+        SpawnWorldVisuals(worldState, gridManager);
+    }
+
+    static WorldState CreateWorldState(int worldSize)
+    {
+        GameObject worldStateObj = new GameObject("WorldState");
+        WorldState worldState = worldStateObj.AddComponent<WorldState>();
+        worldStateObj.AddComponent<WorldVisualSpawner>();
+        int size = worldSize * 2 + 1;
+        worldState.CreateEmptyWorld(size, size, 1f, new Vector3(-worldSize, 0, -worldSize));
+        return worldState;
+    }
+
+    static GridManager CreateGridManager(int worldSize)
+    {
+        GameObject gridObj = new GameObject("GridManager");
+        GridManager gridManager = gridObj.AddComponent<GridManager>();
+        gridManager.width = worldSize * 2 + 1;
+        gridManager.height = worldSize * 2 + 1;
+        gridManager.gridSize = new Vector2(gridManager.width, gridManager.height);
+        gridManager.tileSize = 1f;
+        gridManager.originPosition = new Vector3(-worldSize, 0, -worldSize);
+        gridManager.CreateGrid();
+        return gridManager;
+    }
+
+    static void GenerateWorldData(WorldState worldState)
+    {
+        System.Random rng = new System.Random(42);
+
+        foreach (WorldTileData tile in worldState.tiles)
+        {
+            Vector3 worldPosition = worldState.GridToWorldPosition(tile.coordinates);
+            float noise = Mathf.PerlinNoise(worldPosition.x * 0.2f, worldPosition.z * 0.2f);
+
+            if (noise < 0.2f)
+                worldState.SetTileType(tile.coordinates, WorldTileType.Water, false);
+            else if (noise < 0.3f)
+                worldState.SetTileType(tile.coordinates, WorldTileType.Path, true);
+            else if (noise < 0.5f)
+                worldState.SetTileType(tile.coordinates, WorldTileType.Stone, true);
+            else if (noise < 0.7f)
+                worldState.SetTileType(tile.coordinates, WorldTileType.DarkGrass, true);
+            else
+                worldState.SetTileType(tile.coordinates, WorldTileType.Grass, true);
+        }
+
+        AddObstacleData(worldState, rng);
+        AddResourceData(worldState, rng);
+    }
+
+    static void AddObstacleData(WorldState worldState, System.Random rng)
+    {
+        for (int i = 0; i < 25; i++)
+        {
+            Vector2Int position = RandomWorldPosition(worldState, rng, -8, 9);
+            if (IsNearStart(position, worldState))
+                continue;
+
+            worldState.SetObstacle(position, WorldObstacleType.Rock);
+        }
+
+        for (int i = 0; i < 15; i++)
+        {
+            Vector2Int position = RandomWorldPosition(worldState, rng, -8, 9);
+            if (IsNearStart(position, worldState))
+                continue;
+
+            worldState.SetObstacle(position, WorldObstacleType.Tree);
+        }
+    }
+
+    static void AddResourceData(WorldState worldState, System.Random rng)
+    {
+        for (int i = 0; i < 10; i++)
+            worldState.SetResource(RandomWorldPosition(worldState, rng, -9, 10), WorldResourceType.Scrap);
+
+        for (int i = 0; i < 8; i++)
+            worldState.SetResource(RandomWorldPosition(worldState, rng, -8, 9), WorldResourceType.Crystal);
+    }
+
+    static Vector2Int RandomWorldPosition(WorldState worldState, System.Random rng, int min, int max)
+    {
+        int x = rng.Next(min, max);
+        int z = rng.Next(min, max);
+        return worldState.WorldToGridPosition(new Vector3(x, 0, z));
+    }
+
+    static bool IsNearStart(Vector2Int position, WorldState worldState)
+    {
+        Vector2Int start = worldState.WorldToGridPosition(Vector3.zero);
+        return Mathf.Abs(position.x - start.x) < 2 && Mathf.Abs(position.y - start.y) < 2;
+    }
+
+    static void SpawnWorldVisuals(WorldState worldState, GridManager gridManager)
+    {
         Material grassMat = Mat(new Color(0.3f, 0.6f, 0.25f));
         Material stoneMat = Mat(new Color(0.5f, 0.5f, 0.55f));
         Material waterMat = Mat(new Color(0.2f, 0.4f, 0.7f));
         Material pathMat = Mat(new Color(0.65f, 0.5f, 0.35f));
         Material darkGrassMat = Mat(new Color(0.25f, 0.5f, 0.2f));
-
-        int worldSize = 10;
-        GameObject terrainParent = new GameObject("Terrain");
-
-        for (int x = -worldSize; x <= worldSize; x++)
-        {
-            for (int z = -worldSize; z <= worldSize; z++)
-            {
-                GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                tile.name = "Tile";
-                tile.transform.parent = terrainParent.transform;
-                tile.transform.position = new Vector3(x, 0, z);
-                tile.transform.localScale = new Vector3(0.95f, 0.15f, 0.95f);
-
-                float noise = Mathf.PerlinNoise(x * 0.2f, z * 0.2f);
-
-                if (noise < 0.2f)
-                {
-                    Paint(tile, waterMat);
-                    tile.transform.localScale = new Vector3(0.95f, 0.3f, 0.95f);
-                }
-                else if (noise < 0.3f)
-                {
-                    Paint(tile, pathMat);
-                }
-                else if (noise < 0.5f)
-                {
-                    Paint(tile, stoneMat);
-                }
-                else if (noise < 0.7f)
-                {
-                    Paint(tile, darkGrassMat);
-                }
-                else
-                {
-                    Paint(tile, grassMat);
-                }
-            }
-        }
-
-        CreateDecorations();
-    }
-
-    static void CreateDecorations()
-    {
         Material rockMat = Mat(new Color(0.6f, 0.6f, 0.65f));
         Material treeMat = Mat(new Color(0.3f, 0.5f, 0.2f));
         Material trunkMat = Mat(new Color(0.4f, 0.25f, 0.15f));
         Material junkMat = Mat(new Color(0.5f, 0.5f, 0.6f));
         Material crystalMat = Mat(new Color(0.6f, 0.2f, 0.8f));
 
-        System.Random rng = new System.Random(42);
+        GameObject terrainParent = new GameObject("Terrain");
+        GameObject objectsParent = new GameObject("WorldObjects");
 
-        for (int i = 0; i < 25; i++)
+        foreach (WorldTileData tileData in worldState.tiles)
         {
-            int x = rng.Next(-8, 9);
-            int z = rng.Next(-8, 9);
-            float scale = (float)(rng.NextDouble() * 0.5 + 0.5);
+            Vector3 worldPosition = worldState.GridToWorldPosition(tileData.coordinates);
+            CreateTileVisual(tileData, worldPosition, terrainParent.transform, grassMat, stoneMat, waterMat, pathMat, darkGrassMat);
 
-            GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            rock.name = "Rock";
-            rock.transform.position = new Vector3(x, scale * 0.4f, z);
-            rock.transform.localScale = new Vector3(scale, scale * 0.6f, scale);
-            Paint(rock, rockMat);
+            if (gridManager != null && !tileData.walkable)
+                gridManager.SetObstacleAtWorldPosition(worldPosition, true);
+
+            if (tileData.obstacleType == WorldObstacleType.Rock)
+                SpawnRock(tileData, worldPosition, objectsParent.transform, rockMat, gridManager, worldState);
+            else if (tileData.obstacleType == WorldObstacleType.Tree)
+                SpawnTree(tileData, worldPosition, objectsParent.transform, treeMat, trunkMat, gridManager, worldState);
+
+            if (tileData.HasResource())
+                SpawnResource(tileData, worldPosition, objectsParent.transform, junkMat, crystalMat, gridManager, worldState);
+        }
+    }
+
+    static void CreateTileVisual(WorldTileData tileData, Vector3 worldPosition, Transform parent, Material grassMat, Material stoneMat, Material waterMat, Material pathMat, Material darkGrassMat)
+    {
+        GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        tile.name = "Tile";
+        tile.transform.parent = parent;
+        tile.transform.position = worldPosition;
+        tile.transform.localScale = new Vector3(0.95f, 0.15f, 0.95f);
+
+        if (tileData.tileType == WorldTileType.Water)
+        {
+            Paint(tile, waterMat);
+            tile.transform.localScale = new Vector3(0.95f, 0.3f, 0.95f);
+        }
+        else if (tileData.tileType == WorldTileType.Path)
+        {
+            Paint(tile, pathMat);
+        }
+        else if (tileData.tileType == WorldTileType.Stone)
+        {
+            Paint(tile, stoneMat);
+        }
+        else if (tileData.tileType == WorldTileType.DarkGrass)
+        {
+            Paint(tile, darkGrassMat);
+        }
+        else
+        {
+            Paint(tile, grassMat);
+        }
+    }
+
+    static void SpawnRock(WorldTileData tileData, Vector3 worldPosition, Transform parent, Material rockMat, GridManager gridManager, WorldState worldState)
+    {
+        GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        rock.name = "Rock";
+        rock.transform.parent = parent;
+        rock.transform.position = worldPosition + new Vector3(0, 0.35f, 0);
+        rock.transform.localScale = new Vector3(0.8f, 0.5f, 0.8f);
+        Paint(rock, rockMat);
+
+        Interactable rockInteractable = rock.AddComponent<Interactable>();
+        rockInteractable.type = InteractableType.Rock;
+        rockInteractable.gridManager = gridManager;
+        rockInteractable.worldState = worldState;
+
+        tileData.worldObject = rock;
+
+        if (gridManager != null)
+        {
+            gridManager.SetObstacleAtWorldPosition(worldPosition, true);
+            gridManager.SetInteractableAtWorldPosition(worldPosition, rockInteractable);
+        }
+    }
+
+    static void SpawnTree(WorldTileData tileData, Vector3 worldPosition, Transform parent, Material treeMat, Material trunkMat, GridManager gridManager, WorldState worldState)
+    {
+        GameObject treeRoot = new GameObject("Tree");
+        treeRoot.transform.parent = parent;
+        treeRoot.transform.position = worldPosition;
+
+        GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        trunk.name = "TreeTrunk";
+        trunk.transform.parent = treeRoot.transform;
+        trunk.transform.position = worldPosition + new Vector3(0, 0.8f, 0);
+        trunk.transform.localScale = new Vector3(0.15f, 0.8f, 0.15f);
+        Paint(trunk, trunkMat);
+
+        Interactable treeInteractable = trunk.AddComponent<Interactable>();
+        treeInteractable.type = InteractableType.Tree;
+        treeInteractable.gridManager = gridManager;
+        treeInteractable.worldState = worldState;
+
+        GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        foliage.name = "TreeFoliage";
+        foliage.transform.parent = treeRoot.transform;
+        foliage.transform.position = worldPosition + new Vector3(0, 2f, 0);
+        foliage.transform.localScale = new Vector3(1.8f, 1.4f, 1.8f);
+        Paint(foliage, treeMat);
+
+        tileData.worldObject = treeRoot;
+
+        if (gridManager != null)
+        {
+            gridManager.SetObstacleAtWorldPosition(worldPosition, true);
+            gridManager.SetInteractableAtWorldPosition(worldPosition, treeInteractable);
+        }
+    }
+
+    static void SpawnResource(WorldTileData tileData, Vector3 worldPosition, Transform parent, Material junkMat, Material crystalMat, GridManager gridManager, WorldState worldState)
+    {
+        GameObject resource;
+        InteractableType interactableType;
+
+        if (tileData.resourceType == WorldResourceType.Crystal)
+        {
+            resource = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            resource.name = "Crystal";
+            resource.transform.position = worldPosition + new Vector3(0, 0.4f, 0);
+            resource.transform.localScale = new Vector3(0.15f, 0.8f, 0.15f);
+            Paint(resource, crystalMat);
+            interactableType = InteractableType.Crystal;
+        }
+        else
+        {
+            resource = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            resource.name = "RobotJunk";
+            resource.transform.position = worldPosition + new Vector3(0, 0.2f, 0);
+            resource.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+            Paint(resource, junkMat);
+            interactableType = InteractableType.Scrap;
         }
 
-        for (int i = 0; i < 15; i++)
-        {
-            int x = rng.Next(-8, 9);
-            int z = rng.Next(-8, 9);
+        resource.transform.parent = parent;
+        Interactable interactable = resource.AddComponent<Interactable>();
+        interactable.type = interactableType;
+        interactable.gridManager = gridManager;
+        interactable.worldState = worldState;
+        tileData.worldObject = resource;
 
-            if (Mathf.Abs(x) < 2 && Mathf.Abs(z) < 2) continue;
-
-            float height = (float)(rng.NextDouble() * 1.5 + 1.5);
-
-            GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            trunk.name = "TreeTrunk";
-            trunk.transform.position = new Vector3(x, height * 0.4f, z);
-            trunk.transform.localScale = new Vector3(0.15f, height * 0.4f, 0.15f);
-            Paint(trunk, trunkMat);
-
-            Interactable treeInteractable = trunk.AddComponent<Interactable>();
-            treeInteractable.type = InteractableType.Tree;
-
-            GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            foliage.name = "TreeFoliage";
-            foliage.transform.position = new Vector3(x, height * 0.8f + 0.5f, z);
-            foliage.transform.localScale = new Vector3(height * 0.8f, height * 0.6f, height * 0.8f);
-            Paint(foliage, treeMat);
-
-            Interactable foliageInteractable = foliage.AddComponent<Interactable>();
-            foliageInteractable.type = InteractableType.Tree;
-        }
-
-        for (int i = 0; i < 10; i++)
-        {
-            int x = rng.Next(-9, 10);
-            int z = rng.Next(-9, 10);
-
-            GameObject junk = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            junk.name = "RobotJunk";
-            junk.transform.position = new Vector3(x, 0.2f, z);
-            junk.transform.rotation = Quaternion.Euler(0, rng.Next(0, 360), 0);
-            junk.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
-            Paint(junk, junkMat);
-
-            Interactable scrapInteractable = junk.AddComponent<Interactable>();
-            scrapInteractable.type = InteractableType.Scrap;
-        }
-
-        for (int i = 0; i < 8; i++)
-        {
-            int x = rng.Next(-8, 9);
-            int z = rng.Next(-8, 9);
-
-            GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            crystal.name = "Crystal";
-            crystal.transform.position = new Vector3(x, 0.4f, z);
-            crystal.transform.localScale = new Vector3(0.15f, 0.8f, 0.15f);
-            Paint(crystal, crystalMat);
-
-            Interactable crystalInteractable = crystal.AddComponent<Interactable>();
-            crystalInteractable.type = InteractableType.Crystal;
-        }
+        if (gridManager != null)
+            gridManager.SetInteractableAtWorldPosition(worldPosition, interactable);
     }
 
     static void CreateUI()
@@ -224,21 +371,6 @@ public static class BotiSceneBuilder
         inventoryCanvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
         inventoryCanvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
-        // Scrap text
-        GameObject scrapTextObj = new GameObject("ScrapText");
-        scrapTextObj.transform.SetParent(inventoryCanvasObj.transform);
-        RectTransform scrapRect = scrapTextObj.AddComponent<RectTransform>();
-        scrapRect.anchorMin = new Vector2(0f, 1f);
-        scrapRect.anchorMax = new Vector2(0f, 1f);
-        scrapRect.pivot = new Vector2(0f, 1f);
-        scrapRect.anchoredPosition = new Vector2(20, -20);
-        scrapRect.sizeDelta = new Vector2(200, 40);
-
-        Text scrapText = scrapTextObj.AddComponent<Text>();
-        scrapText.text = "Scrap: 0";
-        scrapText.fontSize = 24;
-        scrapText.color = Color.white;
-
         // Crystal text
         GameObject crystalTextObj = new GameObject("CrystalText");
         crystalTextObj.transform.SetParent(inventoryCanvasObj.transform);
@@ -246,13 +378,43 @@ public static class BotiSceneBuilder
         crystalRect.anchorMin = new Vector2(0f, 1f);
         crystalRect.anchorMax = new Vector2(0f, 1f);
         crystalRect.pivot = new Vector2(0f, 1f);
-        crystalRect.anchoredPosition = new Vector2(20, -60);
+        crystalRect.anchoredPosition = new Vector2(20, -20);
         crystalRect.sizeDelta = new Vector2(200, 40);
 
         Text crystalText = crystalTextObj.AddComponent<Text>();
         crystalText.text = "Crystal: 0";
         crystalText.fontSize = 24;
         crystalText.color = Color.white;
+
+        // Scrap text
+        GameObject scrapTextObj = new GameObject("ScrapText");
+        scrapTextObj.transform.SetParent(inventoryCanvasObj.transform);
+        RectTransform scrapRect = scrapTextObj.AddComponent<RectTransform>();
+        scrapRect.anchorMin = new Vector2(0f, 1f);
+        scrapRect.anchorMax = new Vector2(0f, 1f);
+        scrapRect.pivot = new Vector2(0f, 1f);
+        scrapRect.anchoredPosition = new Vector2(20, -60);
+        scrapRect.sizeDelta = new Vector2(200, 40);
+
+        Text scrapText = scrapTextObj.AddComponent<Text>();
+        scrapText.text = "Scrap: 0";
+        scrapText.fontSize = 24;
+        scrapText.color = Color.white;
+
+        // Wood text
+        GameObject woodTextObj = new GameObject("WoodText");
+        woodTextObj.transform.SetParent(inventoryCanvasObj.transform);
+        RectTransform woodRect = woodTextObj.AddComponent<RectTransform>();
+        woodRect.anchorMin = new Vector2(0f, 1f);
+        woodRect.anchorMax = new Vector2(0f, 1f);
+        woodRect.pivot = new Vector2(0f, 1f);
+        woodRect.anchoredPosition = new Vector2(20, -100);
+        woodRect.sizeDelta = new Vector2(200, 40);
+
+        Text woodText = woodTextObj.AddComponent<Text>();
+        woodText.text = "Wood: 0";
+        woodText.fontSize = 24;
+        woodText.color = Color.white;
 
         // Interaction Canvas
         GameObject canvasObj = new GameObject("InteractionCanvas");
@@ -282,6 +444,53 @@ public static class BotiSceneBuilder
         UnityEngine.UI.Outline outline = textObj.AddComponent<UnityEngine.UI.Outline>();
         outline.effectColor = new Color(0, 0, 0, 0.5f);
         outline.effectDistance = new Vector2(2, -2);
+
+        BotiUI botiUI = canvasObj.AddComponent<BotiUI>();
+        botiUI.interactionText = promptText;
+
+        GameObject buildTextObj = new GameObject("BuildModeText");
+        buildTextObj.transform.SetParent(canvasObj.transform);
+
+        RectTransform buildRect = buildTextObj.AddComponent<RectTransform>();
+        buildRect.anchorMin = new Vector2(1f, 1f);
+        buildRect.anchorMax = new Vector2(1f, 1f);
+        buildRect.pivot = new Vector2(1f, 1f);
+        buildRect.anchoredPosition = new Vector2(-20, -20);
+        buildRect.sizeDelta = new Vector2(280, 80);
+
+        UnityEngine.UI.Text buildText = buildTextObj.AddComponent<UnityEngine.UI.Text>();
+        buildText.text = "Build Mode: OFF\nSelected: Wall";
+        buildText.fontSize = 22;
+        buildText.color = Color.white;
+        buildText.alignment = TextAnchor.UpperRight;
+
+        UnityEngine.UI.Outline buildOutline = buildTextObj.AddComponent<UnityEngine.UI.Outline>();
+        buildOutline.effectColor = new Color(0, 0, 0, 0.5f);
+        buildOutline.effectDistance = new Vector2(2, -2);
+
+        botiUI.buildText = buildText;
+
+        GameObject toolTextObj = new GameObject("EquippedToolText");
+        toolTextObj.transform.SetParent(canvasObj.transform);
+
+        RectTransform toolRect = toolTextObj.AddComponent<RectTransform>();
+        toolRect.anchorMin = new Vector2(1f, 1f);
+        toolRect.anchorMax = new Vector2(1f, 1f);
+        toolRect.pivot = new Vector2(1f, 1f);
+        toolRect.anchoredPosition = new Vector2(-20, -105);
+        toolRect.sizeDelta = new Vector2(280, 40);
+
+        UnityEngine.UI.Text toolText = toolTextObj.AddComponent<UnityEngine.UI.Text>();
+        toolText.text = "Equipped Tool: Axe";
+        toolText.fontSize = 22;
+        toolText.color = Color.white;
+        toolText.alignment = TextAnchor.UpperRight;
+
+        UnityEngine.UI.Outline toolOutline = toolTextObj.AddComponent<UnityEngine.UI.Outline>();
+        toolOutline.effectColor = new Color(0, 0, 0, 0.5f);
+        toolOutline.effectDistance = new Vector2(2, -2);
+
+        botiUI.toolText = toolText;
     }
 
     static void CreateBoti()
@@ -294,9 +503,14 @@ public static class BotiSceneBuilder
         Paint(boti, botiMat);
 
         BotiPlayerController playerCtrl = boti.AddComponent<BotiPlayerController>();
+        BotiFeedback feedback = boti.AddComponent<BotiFeedback>();
         playerCtrl.moveSpeed = 6f;
         playerCtrl.gridSize = 1f;
         playerCtrl.interactionRange = 3f;
+        playerCtrl.gridManager = Object.FindObjectOfType<GridManager>();
+        playerCtrl.worldState = Object.FindObjectOfType<WorldState>();
+        playerCtrl.visualSpawner = Object.FindObjectOfType<WorldVisualSpawner>();
+        playerCtrl.feedback = feedback;
 
         // Add inventory
         BotiInventory inventory = boti.AddComponent<BotiInventory>();
@@ -304,31 +518,84 @@ public static class BotiSceneBuilder
         // Wire up inventory UI texts
         Text scrapText = GameObject.Find("ScrapText").GetComponent<Text>();
         Text crystalText = GameObject.Find("CrystalText").GetComponent<Text>();
+        Text woodText = GameObject.Find("WoodText").GetComponent<Text>();
         inventory.scrapText = scrapText;
         inventory.crystalText = crystalText;
+        inventory.woodText = woodText;
         inventory.UpdateUI();
 
         // Wire up interaction prompt
         UnityEngine.UI.Text promptText = GameObject.Find("InteractionPrompt").GetComponent<UnityEngine.UI.Text>();
+        BotiUI botiUI = Object.FindObjectOfType<BotiUI>();
         playerCtrl.interactionPromptText = promptText;
+        playerCtrl.botiUI = botiUI;
         playerCtrl.inventory = inventory;
 
         // Wire up inventory reference to all Interactables
         Interactable[] interactables = Object.FindObjectsOfType<Interactable>();
+        GridManager gridManager = Object.FindObjectOfType<GridManager>();
+        WorldState worldState = Object.FindObjectOfType<WorldState>();
+        WorldVisualSpawner visualSpawner = Object.FindObjectOfType<WorldVisualSpawner>();
         foreach (Interactable inter in interactables)
         {
             inter.inventory = inventory;
+            if (inter.gridManager == null)
+                inter.gridManager = gridManager;
+            if (inter.worldState == null)
+                inter.worldState = worldState;
+            if (inter.visualSpawner == null)
+                inter.visualSpawner = visualSpawner;
+            if (inter.feedback == null)
+                inter.feedback = feedback;
         }
 
         Camera cam = Object.FindObjectOfType<Camera>();
         if (cam != null)
+            ConfigureFixedCamera(cam);
+
+        CreateSaveSystem(playerCtrl, inventory, gridManager, worldState);
+    }
+
+    static void ConfigureFixedCamera(Camera cam)
+    {
+        cam.transform.SetParent(null);
+        cam.gameObject.name = "MainCamera";
+        cam.tag = "MainCamera";
+        cam.orthographic = true;
+        cam.orthographicSize = 15;
+        cam.transform.position = new Vector3(0, 26, -18);
+        cam.transform.rotation = Quaternion.Euler(60, 0, 0);
+
+        if (cam.GetComponent<AudioListener>() == null)
         {
-            CameraFollow camFollow = cam.GetComponent<CameraFollow>();
-            if (camFollow != null)
-            {
-                camFollow.SetTarget(boti.transform);
-                camFollow.SnapToTarget();
-            }
+            cam.gameObject.AddComponent<AudioListener>();
+            Debug.Log("BotiSceneBuilder added missing AudioListener to MainCamera.");
         }
+
+        CameraFollow camFollow = cam.GetComponent<CameraFollow>();
+        if (camFollow == null)
+        {
+            camFollow = cam.gameObject.AddComponent<CameraFollow>();
+            Debug.Log("BotiSceneBuilder added CameraFollow fixed camera guard to MainCamera.");
+        }
+
+        if (camFollow != null)
+        {
+            camFollow.fixedPosition = new Vector3(0, 26, -18);
+            camFollow.fixedRotation = new Vector3(60, 0, 0);
+            camFollow.orthographicSize = 15;
+            camFollow.ApplyFixedCamera();
+        }
+    }
+
+    static void CreateSaveSystem(BotiPlayerController playerCtrl, BotiInventory inventory, GridManager gridManager, WorldState worldState)
+    {
+        GameObject saveObj = new GameObject("SaveSystem");
+        SaveSystem saveSystem = saveObj.AddComponent<SaveSystem>();
+        saveSystem.player = playerCtrl;
+        saveSystem.inventory = inventory;
+        saveSystem.gridManager = gridManager;
+        saveSystem.worldState = worldState;
+        saveSystem.visualSpawner = Object.FindObjectOfType<WorldVisualSpawner>();
     }
 }

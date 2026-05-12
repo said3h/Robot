@@ -4,8 +4,8 @@ using UnityEditor;
 #endif
 
 /// <summary>
-/// Script para arreglar completamente la cámara.
-/// Para usar: GameObject → Fix Camera Setup
+/// Editor helper para reparar la camara principal sin crear duplicados.
+/// Para usar: GameObject -> Fix Camera Setup
 /// </summary>
 public class FixCameraSetup : MonoBehaviour
 {
@@ -13,94 +13,106 @@ public class FixCameraSetup : MonoBehaviour
     [MenuItem("GameObject/Fix Camera Setup")]
     public static void FixCamera()
     {
-        Debug.Log("═══════════════════════════════");
-        Debug.Log("Fixing Camera Setup...");
-        Debug.Log("═══════════════════════════════");
-        
-        // Eliminar cámaras antiguas
-        Camera[] oldCameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
-        foreach (Camera oldCam in oldCameras)
-        {
-            if (oldCam.gameObject.name != "Main Camera")
-            {
-                Object.DestroyImmediate(oldCam.gameObject);
-                Debug.Log("✓ Eliminada cámara antigua: " + oldCam.gameObject.name);
-            }
-        }
-        
-        // Crear o buscar Main Camera
-        Camera cam = GameObject.Find("Main Camera")?.GetComponent<Camera>();
-        
+        Debug.Log("Fixing Boti RTS camera setup...");
+
+        Camera cam = GameObject.Find("MainCamera")?.GetComponent<Camera>();
+        if (cam == null)
+            cam = GameObject.Find("Main Camera")?.GetComponent<Camera>();
+        if (cam == null)
+            cam = Camera.main;
+
         if (cam == null)
         {
-            GameObject camObj = GameObject.Find("Camera");
-            if (camObj != null)
-            {
-                camObj.name = "Main Camera";
-                cam = camObj.GetComponent<Camera>();
-            }
+            GameObject legacyCamera = GameObject.Find("Camera");
+            if (legacyCamera != null)
+                cam = legacyCamera.GetComponent<Camera>();
         }
-        
+
         if (cam == null)
         {
-            GameObject newCamObj = new GameObject("Main Camera");
-            cam = newCamObj.AddComponent<Camera>();
-            Debug.Log("✓ Nueva Main Camera creada");
+            GameObject newCamera = new GameObject("MainCamera");
+            cam = newCamera.AddComponent<Camera>();
+            newCamera.AddComponent<AudioListener>();
+            Debug.Log("FixCameraSetup created MainCamera with AudioListener.");
         }
         else
         {
-            Debug.Log("✓ Main Camera encontrada");
+            Debug.Log("FixCameraSetup reused existing MainCamera.");
         }
-        
-        // Configuración básica de cámara
+
+        RemoveDuplicateCameras(cam);
+        ConfigureMainCamera(cam);
+        EnsureDirectionalLight();
+
+        Debug.Log("Boti RTS camera setup completed.");
+    }
+
+    static void RemoveDuplicateCameras(Camera mainCamera)
+    {
+        Camera[] cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        foreach (Camera camera in cameras)
+        {
+            if (camera != null && camera != mainCamera)
+            {
+                Debug.LogWarning("FixCameraSetup removed duplicate camera: " + camera.gameObject.name);
+                Object.DestroyImmediate(camera.gameObject);
+            }
+        }
+    }
+
+    static void ConfigureMainCamera(Camera cam)
+    {
+        cam.gameObject.name = "MainCamera";
+        cam.tag = "MainCamera";
+        cam.transform.SetParent(null);
+        cam.transform.position = new Vector3(0, 26, -18);
+        cam.transform.rotation = Quaternion.Euler(60, 0, 0);
         cam.clearFlags = CameraClearFlags.Skybox;
-        cam.backgroundColor = new Color(0.1f, 0.1f, 0.2f); // Azul oscuro
-        cam.cullingMask = -1; // Todo visible
-        
-        // Posición para ver toda la escena
-        cam.transform.position = new Vector3(0, 12, -12);
-        cam.transform.rotation = Quaternion.Euler(35, 0, 0);
-        
-        // Lente
-        cam.fieldOfView = 50;
+        cam.backgroundColor = new Color(0.1f, 0.1f, 0.2f);
+        cam.cullingMask = -1;
+        cam.orthographic = true;
+        cam.orthographicSize = 15;
         cam.nearClipPlane = 0.3f;
         cam.farClipPlane = 1000f;
-        
-        // Asegurar que sea la cámara principal
-        cam.tag = "MainCamera";
-        
-        Debug.Log("✓ Cámara configurada:");
-        Debug.Log("  Posición: " + cam.transform.position);
-        Debug.Log("  Rotación: " + cam.transform.eulerAngles);
-        Debug.Log("  FOV: " + cam.fieldOfView);
-        
-        // Crear luz direccional si no existe
+
+        if (cam.GetComponent<AudioListener>() == null)
+        {
+            cam.gameObject.AddComponent<AudioListener>();
+            Debug.Log("FixCameraSetup added missing AudioListener to MainCamera.");
+        }
+
+        CameraFollow follow = cam.GetComponent<CameraFollow>();
+        if (follow == null)
+        {
+            follow = cam.gameObject.AddComponent<CameraFollow>();
+            Debug.Log("FixCameraSetup added CameraFollow fixed camera guard.");
+        }
+
+        follow.fixedPosition = new Vector3(0, 26, -18);
+        follow.fixedRotation = new Vector3(60, 0, 0);
+        follow.orthographicSize = 15;
+        follow.ApplyFixedCamera();
+
+        Debug.Log("MainCamera position: " + cam.transform.position);
+        Debug.Log("MainCamera rotation: " + cam.transform.eulerAngles);
+        Debug.Log("MainCamera orthographic size: " + cam.orthographicSize);
+    }
+
+    static void EnsureDirectionalLight()
+    {
         Light[] lights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
-        bool hasDirectionalLight = false;
-        
         foreach (Light light in lights)
         {
             if (light.type == LightType.Directional)
-            {
-                hasDirectionalLight = true;
-                break;
-            }
+                return;
         }
-        
-        if (!hasDirectionalLight)
-        {
-            GameObject lightObj = new GameObject("Directional Light");
-            Light dirLight = lightObj.AddComponent<Light>();
-            dirLight.type = LightType.Directional;
-            dirLight.transform.rotation = Quaternion.Euler(50, -30, 0);
-            dirLight.intensity = 1f;
-            Debug.Log("✓ Luz direccional creada");
-        }
-        
-        Debug.Log("═══════════════════════════════");
-        Debug.Log("¡Configuración de cámara completada!");
-        Debug.Log("Ahora ve a Game View y你应该 ver la escena.");
-        Debug.Log("═══════════════════════════════");
+
+        GameObject lightObj = new GameObject("Directional Light");
+        Light dirLight = lightObj.AddComponent<Light>();
+        dirLight.type = LightType.Directional;
+        dirLight.transform.rotation = Quaternion.Euler(50, -30, 0);
+        dirLight.intensity = 1f;
+        Debug.Log("FixCameraSetup created Directional Light.");
     }
 #endif
 }
