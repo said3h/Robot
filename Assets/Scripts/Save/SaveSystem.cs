@@ -55,6 +55,8 @@ public class SaveSystem : MonoBehaviour
         saveData.crystalCount = inventory.crystalCount;
         saveData.scrapCount = inventory.scrapCount;
         saveData.woodCount = inventory.woodCount;
+        saveData.plankCount = inventory.plankCount;
+        saveData.metalPlateCount = inventory.metalPlateCount;
         saveData.equippedTool = player.equippedTool;
         saveData.world = worldState.CreateSaveData();
 
@@ -88,7 +90,8 @@ public class SaveSystem : MonoBehaviour
             gridManager.ApplyWorldState(worldState);
 
         if (inventory != null)
-            inventory.SetCounts(saveData.crystalCount, saveData.scrapCount, saveData.woodCount);
+            inventory.SetCounts(saveData.crystalCount, saveData.scrapCount, saveData.woodCount,
+                saveData.plankCount, saveData.metalPlateCount);
 
         if (visualSpawner != null)
             visualSpawner.RebuildVisuals(worldState, gridManager, inventory);

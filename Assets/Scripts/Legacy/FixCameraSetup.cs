@@ -13,8 +13,6 @@ public class FixCameraSetup : MonoBehaviour
     [MenuItem("GameObject/Fix Camera Setup")]
     public static void FixCamera()
     {
-        Debug.Log("Fixing Boti RTS camera setup...");
-
         Camera cam = GameObject.Find("MainCamera")?.GetComponent<Camera>();
         if (cam == null)
             cam = GameObject.Find("Main Camera")?.GetComponent<Camera>();
@@ -33,18 +31,14 @@ public class FixCameraSetup : MonoBehaviour
             GameObject newCamera = new GameObject("MainCamera");
             cam = newCamera.AddComponent<Camera>();
             newCamera.AddComponent<AudioListener>();
-            Debug.Log("FixCameraSetup created MainCamera with AudioListener.");
         }
         else
         {
-            Debug.Log("FixCameraSetup reused existing MainCamera.");
         }
 
         RemoveDuplicateCameras(cam);
         ConfigureMainCamera(cam);
         EnsureDirectionalLight();
-
-        Debug.Log("Boti RTS camera setup completed.");
     }
 
     static void RemoveDuplicateCameras(Camera mainCamera)
@@ -53,10 +47,7 @@ public class FixCameraSetup : MonoBehaviour
         foreach (Camera camera in cameras)
         {
             if (camera != null && camera != mainCamera)
-            {
-                Debug.LogWarning("FixCameraSetup removed duplicate camera: " + camera.gameObject.name);
                 Object.DestroyImmediate(camera.gameObject);
-            }
         }
     }
 
@@ -76,26 +67,16 @@ public class FixCameraSetup : MonoBehaviour
         cam.farClipPlane = 1000f;
 
         if (cam.GetComponent<AudioListener>() == null)
-        {
             cam.gameObject.AddComponent<AudioListener>();
-            Debug.Log("FixCameraSetup added missing AudioListener to MainCamera.");
-        }
 
         CameraFollow follow = cam.GetComponent<CameraFollow>();
         if (follow == null)
-        {
             follow = cam.gameObject.AddComponent<CameraFollow>();
-            Debug.Log("FixCameraSetup added CameraFollow fixed camera guard.");
-        }
 
         follow.fixedPosition = new Vector3(0, 26, -18);
         follow.fixedRotation = new Vector3(60, 0, 0);
         follow.orthographicSize = 15;
         follow.ApplyFixedCamera();
-
-        Debug.Log("MainCamera position: " + cam.transform.position);
-        Debug.Log("MainCamera rotation: " + cam.transform.eulerAngles);
-        Debug.Log("MainCamera orthographic size: " + cam.orthographicSize);
     }
 
     static void EnsureDirectionalLight()
@@ -112,7 +93,6 @@ public class FixCameraSetup : MonoBehaviour
         dirLight.type = LightType.Directional;
         dirLight.transform.rotation = Quaternion.Euler(50, -30, 0);
         dirLight.intensity = 1f;
-        Debug.Log("FixCameraSetup created Directional Light.");
     }
 #endif
 }

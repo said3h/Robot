@@ -60,8 +60,6 @@ public static class BotiSceneBuilder
         camFollow.fixedRotation = new Vector3(60, 0, 0);
         camFollow.orthographicSize = 15;
         camFollow.ApplyFixedCamera();
-
-        Debug.Log("BotiSceneBuilder created fixed RTS MainCamera with AudioListener.");
     }
 
     static void RemoveExistingCameras()
@@ -70,10 +68,7 @@ public static class BotiSceneBuilder
         foreach (Camera camera in cameras)
         {
             if (camera != null)
-            {
-                Debug.LogWarning("BotiSceneBuilder removed duplicate camera before creating MainCamera: " + camera.gameObject.name);
                 Object.DestroyImmediate(camera.gameObject);
-            }
         }
     }
 
@@ -567,17 +562,11 @@ public static class BotiSceneBuilder
         cam.transform.rotation = Quaternion.Euler(60, 0, 0);
 
         if (cam.GetComponent<AudioListener>() == null)
-        {
             cam.gameObject.AddComponent<AudioListener>();
-            Debug.Log("BotiSceneBuilder added missing AudioListener to MainCamera.");
-        }
 
         CameraFollow camFollow = cam.GetComponent<CameraFollow>();
         if (camFollow == null)
-        {
             camFollow = cam.gameObject.AddComponent<CameraFollow>();
-            Debug.Log("BotiSceneBuilder added CameraFollow fixed camera guard to MainCamera.");
-        }
 
         if (camFollow != null)
         {

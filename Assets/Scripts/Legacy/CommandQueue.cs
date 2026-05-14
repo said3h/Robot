@@ -83,12 +83,10 @@ public class CommandQueue : MonoBehaviour
         if (currentIndex >= commands.Count)
         {
             isExecuting = false;
-            Debug.Log("Fin de comandos");
             OnExecutionComplete?.Invoke();
             return;
         }
 
-        Debug.Log($"Paso {currentIndex + 1}: {commands[currentIndex]}");
         ExecuteCommand(commands[currentIndex]);
         stepTimer = stepDelay;
     }

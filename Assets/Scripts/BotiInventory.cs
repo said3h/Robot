@@ -9,11 +9,15 @@ public class BotiInventory : MonoBehaviour
     public int scrapCount = 0;
     public int crystalCount = 0;
     public int woodCount = 0;
+    public int plankCount = 0;
+    public int metalPlateCount = 0;
 
     [Header("UI References")]
     public Text scrapText;
     public Text crystalText;
     public Text woodText;
+    public Text plankText;
+    public Text metalPlateText;
 
     public void AddScrap(int amount = 1)
     {
@@ -38,6 +42,16 @@ public class BotiInventory : MonoBehaviour
         crystalCount = crystal;
         scrapCount = scrap;
         woodCount = wood;
+        UpdateUI();
+    }
+
+    public void SetCounts(int crystal, int scrap, int wood, int planks, int metalPlates)
+    {
+        crystalCount = crystal;
+        scrapCount = scrap;
+        woodCount = wood;
+        plankCount = planks;
+        metalPlateCount = metalPlates;
         UpdateUI();
     }
 
@@ -73,5 +87,11 @@ public class BotiInventory : MonoBehaviour
 
         if (woodText != null)
             woodText.text = "Wood: " + woodCount;
+
+        if (plankText != null)
+            plankText.text = "Plank: " + plankCount;
+
+        if (metalPlateText != null)
+            metalPlateText.text = "MetalPlate: " + metalPlateCount;
     }
 }

@@ -55,7 +55,6 @@ public class CameraFollow : MonoBehaviour
             if (cam == null || cam.gameObject == gameObject)
                 continue;
 
-            Debug.LogWarning("Boti camera guard removed duplicate camera: " + cam.gameObject.name);
             DestroySafely(cam.gameObject);
         }
     }
@@ -68,15 +67,11 @@ public class CameraFollow : MonoBehaviour
             if (listener == null || listener.gameObject == gameObject)
                 continue;
 
-            Debug.LogWarning("Boti camera guard removed duplicate AudioListener from: " + listener.gameObject.name);
             DestroySafely(listener);
         }
 
         if (GetComponent<AudioListener>() == null)
-        {
             gameObject.AddComponent<AudioListener>();
-            Debug.Log("Boti camera guard added AudioListener to MainCamera.");
-        }
     }
 
     private void DestroySafely(Object obj)

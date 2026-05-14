@@ -14,6 +14,8 @@ public class SaveData
     public int crystalCount;
     public int scrapCount;
     public int woodCount;
+    public int plankCount;
+    public int metalPlateCount;
     public BotiTool equippedTool;
 
     public WorldSaveData world;

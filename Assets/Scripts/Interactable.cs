@@ -63,7 +63,6 @@ public class Interactable : MonoBehaviour
                 if (gridManager != null)
                     gridManager.ClearInteractableAtWorldPosition(transform.position);
                 PlayCollectFeedback("+1 Scrap");
-                Debug.Log("Collected scrap");
                 StartCoroutine(CollectAndDestroy(false));
                 return "";
             case InteractableType.Crystal:
@@ -81,7 +80,6 @@ public class Interactable : MonoBehaviour
                 if (gridManager != null)
                     gridManager.ClearInteractableAtWorldPosition(transform.position);
                 PlayCollectFeedback("+1 Crystal");
-                Debug.Log("Collected crystal");
                 StartCoroutine(CollectAndDestroy(false));
                 return "";
             case InteractableType.Tree:

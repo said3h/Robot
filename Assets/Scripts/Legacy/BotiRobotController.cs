@@ -42,25 +42,21 @@ public class BotiRobotController : MonoBehaviour
 
     public void MoveNorth()
     {
-        Debug.Log("MoveNorth called");
         TryMove(new Vector2Int(0, 1));
     }
 
     public void MoveSouth()
     {
-        Debug.Log("MoveSouth called");
         TryMove(new Vector2Int(0, -1));
     }
 
     public void MoveWest()
     {
-        Debug.Log("MoveWest called");
         TryMove(new Vector2Int(-1, 0));
     }
 
     public void MoveEast()
     {
-        Debug.Log("MoveEast called");
         TryMove(new Vector2Int(1, 0));
     }
 
@@ -71,21 +67,16 @@ public class BotiRobotController : MonoBehaviour
         if (nextPosition.x < boardMin || nextPosition.x > boardMax ||
             nextPosition.y < boardMin || nextPosition.y > boardMax)
         {
-            Debug.Log("Movement blocked: outside the board!");
             return;
         }
 
         if (IsObstacle(nextPosition))
         {
-            Debug.Log("Movement blocked: obstacle!");
             return;
         }
 
         gridPosition = nextPosition;
         ApplyGridPosition();
-
-        if (gridPosition == goalPosition)
-            Debug.Log("Boti reached the goal!");
     }
 
     private bool IsObstacle(Vector2Int position)
@@ -104,6 +95,5 @@ public class BotiRobotController : MonoBehaviour
     {
         gridPosition = startPosition;
         ApplyGridPosition();
-        Debug.Log("Robot reset to start position");
     }
 }

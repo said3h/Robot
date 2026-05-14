@@ -35,7 +35,7 @@ public class BotiPlayerController : MonoBehaviour
     public BotiTool equippedTool = BotiTool.Axe;
 
     [Header("Debug")]
-    public bool debugMovementLogs = true;
+    public bool debugMovementLogs = false;
 
     // Movement state
     private Vector3 targetPosition;
@@ -167,6 +167,13 @@ public class BotiPlayerController : MonoBehaviour
     {
         bool changed = false;
         bool toolChanged = false;
+
+        if (keyboard.cKey.wasPressedThisFrame)
+        {
+            CraftingSystem craftingSystem = FindObjectOfType<CraftingSystem>();
+            if (craftingSystem != null)
+                craftingSystem.ToggleCraftingPanel();
+        }
 
         if (keyboard.bKey.wasPressedThisFrame)
         {

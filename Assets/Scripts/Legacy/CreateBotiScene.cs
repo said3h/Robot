@@ -154,7 +154,7 @@ public class CreateBotiScene : MonoBehaviour
 
         // Guardar escena
         EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), scenePath);
-        Debug.Log("✓ Escena guardada en: " + scenePath);
+        Debug.Log("CreateBotiScene saved scene to: " + scenePath);
 
         // Seleccionar Boti en la Hierarchy
         Selection.activeGameObject = boti;
