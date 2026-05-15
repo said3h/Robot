@@ -53,7 +53,7 @@ public static class BotiSceneBuilder
         cam.transform.rotation = Quaternion.Euler(60, 0, 0);
         cam.orthographic = true;
         cam.orthographicSize = 15;
-        cam.backgroundColor = new Color(0.4f, 0.6f, 0.8f);
+        cam.backgroundColor = new Color(0.55f, 0.7f, 0.85f);
 
         CameraFollow camFollow = camObj.AddComponent<CameraFollow>();
         camFollow.fixedPosition = new Vector3(0, 26, -18);
@@ -77,8 +77,14 @@ public static class BotiSceneBuilder
         GameObject lightObj = new GameObject("Directional Light");
         Light light = lightObj.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.intensity = 1.0f;
+        light.intensity = 1.2f;
+        light.color = new Color(1f, 0.95f, 0.85f);
+        light.shadowIntensity = 0.4f;
+        light.shadowDistance = 30f;
         lightObj.transform.rotation = Quaternion.Euler(50, -30, 0);
+
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.3f, 0.35f, 0.4f);
     }
 
     static Material Mat(Color color)
@@ -490,15 +496,82 @@ public static class BotiSceneBuilder
 
     static void CreateBoti()
     {
-        GameObject boti = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        boti.name = "Boti";
-        boti.transform.position = new Vector3(0, 0.6f, 0);
+        Material bodyMat = Mat(new Color(0.72f, 0.75f, 0.8f));
+        Material headMat = Mat(new Color(0.6f, 0.63f, 0.68f));
+        Material eyeMat = Mat(new Color(0.2f, 0.9f, 0.9f));
+        Material accentMat = Mat(new Color(0.9f, 0.3f, 0.2f));
 
-        Material botiMat = Mat(new Color(0.2f, 0.9f, 0.9f));
-        Paint(boti, botiMat);
+        GameObject botiRoot = new GameObject("Boti");
+        botiRoot.transform.position = new Vector3(0, 0, 0);
+        botiRoot.transform.rotation = Quaternion.Euler(0, 0, 0);
 
-        BotiPlayerController playerCtrl = boti.AddComponent<BotiPlayerController>();
-        BotiFeedback feedback = boti.AddComponent<BotiFeedback>();
+        // Torso — cylinder (pivot at center, half-height 0.2)
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        body.name = "Body";
+        body.transform.parent = botiRoot.transform;
+        body.transform.position = new Vector3(0, 0.2f, 0);
+        body.transform.localScale = new Vector3(0.4f, 0.2f, 0.4f);
+        Paint(body, bodyMat);
+
+        // Head — cube (bottom sits on top of torso)
+        GameObject head = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        head.name = "Head";
+        head.transform.parent = botiRoot.transform;
+        head.transform.position = new Vector3(0, 0.55f, 0);
+        head.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
+        Paint(head, headMat);
+
+        // Eyes — two small spheres
+        for (int i = 0; i < 2; i++)
+        {
+            GameObject eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            eye.name = "Eye" + i;
+            eye.transform.parent = head.transform;
+            eye.transform.localPosition = new Vector3(i == 0 ? -0.1f : 0.1f, 0, 0.18f);
+            eye.transform.localScale = new Vector3(0.08f, 0.08f, 0.05f);
+            Paint(eye, eyeMat);
+        }
+
+        // Antenna stalk + tip
+        GameObject antenna = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        antenna.name = "Antenna";
+        antenna.transform.parent = head.transform;
+        antenna.transform.localPosition = new Vector3(0, 0.22f, 0);
+        antenna.transform.localScale = new Vector3(0.03f, 0.15f, 0.03f);
+        Paint(antenna, bodyMat);
+
+        GameObject antennaTip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        antennaTip.name = "AntennaTip";
+        antennaTip.transform.parent = antenna.transform;
+        antennaTip.transform.localPosition = new Vector3(0, 0.13f, 0);
+        antennaTip.transform.localScale = new Vector3(0.07f, 0.07f, 0.07f);
+        Paint(antennaTip, accentMat);
+
+        // Legs — two capsules
+        for (int i = 0; i < 2; i++)
+        {
+            GameObject leg = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            leg.name = "Leg" + i;
+            leg.transform.parent = botiRoot.transform;
+            leg.transform.position = new Vector3(i == 0 ? -0.13f : 0.13f, 0.06f, 0);
+            leg.transform.localScale = new Vector3(0.12f, 0.06f, 0.12f);
+            Paint(leg, bodyMat);
+        }
+
+        // Arms — two cylinders with slight angle
+        for (int i = 0; i < 2; i++)
+        {
+            GameObject arm = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            arm.name = "Arm" + i;
+            arm.transform.parent = botiRoot.transform;
+            arm.transform.position = new Vector3(i == 0 ? -0.32f : 0.32f, 0.24f, 0);
+            arm.transform.localScale = new Vector3(0.08f, 0.22f, 0.08f);
+            arm.transform.rotation = Quaternion.Euler(0, 0, i == 0 ? 18f : -18f);
+            Paint(arm, bodyMat);
+        }
+
+        BotiPlayerController playerCtrl = botiRoot.AddComponent<BotiPlayerController>();
+        BotiFeedback feedback = botiRoot.AddComponent<BotiFeedback>();
         playerCtrl.moveSpeed = 6f;
         playerCtrl.gridSize = 1f;
         playerCtrl.interactionRange = 3f;
@@ -508,7 +581,7 @@ public static class BotiSceneBuilder
         playerCtrl.feedback = feedback;
 
         // Add inventory
-        BotiInventory inventory = boti.AddComponent<BotiInventory>();
+        BotiInventory inventory = botiRoot.AddComponent<BotiInventory>();
 
         // Wire up inventory UI texts
         Text scrapText = GameObject.Find("ScrapText").GetComponent<Text>();
