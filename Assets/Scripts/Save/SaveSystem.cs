@@ -30,13 +30,22 @@ public class SaveSystem : MonoBehaviour
     {
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null)
+        {
+            Debug.LogWarning("SaveSystem: Keyboard.current is null — check Input System package");
             return;
+        }
 
-        if (keyboard.f5Key.wasPressedThisFrame)
+        if (keyboard.kKey.wasPressedThisFrame)
+        {
+            Debug.Log("[SaveSystem] K pressed — calling SaveGame()");
             SaveGame();
+        }
 
-        if (keyboard.f9Key.wasPressedThisFrame)
+        if (keyboard.lKey.wasPressedThisFrame)
+        {
+            Debug.Log("[SaveSystem] L pressed — calling LoadGame()");
             LoadGame();
+        }
     }
 
     public void SaveGame()
@@ -62,49 +71,94 @@ public class SaveSystem : MonoBehaviour
 
         string json = JsonUtility.ToJson(saveData, true);
         File.WriteAllText(SavePath, json);
-        Debug.Log("Game saved to: " + SavePath);
+        Debug.Log("[SaveGame] Saved to: " + SavePath + " — JSON size: " + json.Length + " chars");
     }
 
     public void LoadGame()
     {
+        Debug.Log("[LoadGame] Started");
         FindReferences();
+
+        Debug.Log("[LoadGame] SavePath: " + SavePath);
+        Debug.Log("[LoadGame] File exists: " + File.Exists(SavePath));
 
         if (!File.Exists(SavePath))
         {
-            Debug.LogWarning("No save file found at: " + SavePath);
+            Debug.LogWarning("[LoadGame] No save file found.");
             return;
         }
 
         string json = File.ReadAllText(SavePath);
-        SaveData saveData = JsonUtility.FromJson<SaveData>(json);
+        Debug.Log("[LoadGame] JSON read, length: " + json.Length);
 
-        if (saveData == null || saveData.world == null)
+        if (string.IsNullOrEmpty(json))
         {
-            Debug.LogWarning("Save file is empty or invalid.");
+            Debug.LogWarning("[LoadGame] JSON is empty.");
             return;
         }
 
+        SaveData saveData = JsonUtility.FromJson<SaveData>(json);
+        Debug.Log("[LoadGame] saveData parsed, world null?: " + (saveData == null || saveData.world == null));
+
+        if (saveData == null || saveData.world == null)
+        {
+            Debug.LogWarning("[LoadGame] Save file is empty or invalid.");
+            return;
+        }
+
+        Debug.Log("[LoadGame] Restoring WorldState...");
         worldState.LoadFromSaveData(saveData.world);
+        Debug.Log("[LoadGame] WorldState restored. Tiles loaded: " + (saveData.world != null ? saveData.world.tiles.Count : 0));
 
         if (gridManager != null)
+        {
+            Debug.Log("[LoadGame] Applying WorldState to GridManager...");
             gridManager.ApplyWorldState(worldState);
+            Debug.Log("[LoadGame] GridManager applied.");
+        }
+        else
+        {
+            Debug.LogWarning("[LoadGame] GridManager is null!");
+        }
 
         if (inventory != null)
+        {
+            Debug.Log("[LoadGame] Restoring inventory: crystal=" + saveData.crystalCount + " scrap=" + saveData.scrapCount + " wood=" + saveData.woodCount + " plank=" + saveData.plankCount + " metalPlate=" + saveData.metalPlateCount);
             inventory.SetCounts(saveData.crystalCount, saveData.scrapCount, saveData.woodCount,
                 saveData.plankCount, saveData.metalPlateCount);
+            Debug.Log("[LoadGame] Inventory restored.");
+        }
+        else
+        {
+            Debug.LogWarning("[LoadGame] Inventory is null!");
+        }
 
         if (visualSpawner != null)
+        {
+            Debug.Log("[LoadGame] Rebuilding visuals...");
             visualSpawner.RebuildVisuals(worldState, gridManager, inventory);
+            Debug.Log("[LoadGame] Visuals rebuilt.");
+        }
+        else
+        {
+            Debug.LogWarning("[LoadGame] VisualSpawner is null!");
+        }
 
         if (player != null)
         {
+            Debug.Log("[LoadGame] Restoring player to grid (" + saveData.playerGridX + "," + saveData.playerGridY + ")");
             player.equippedTool = saveData.equippedTool;
             player.SetGridPosition(new Vector2Int(saveData.playerGridX, saveData.playerGridY));
             if (player.botiUI != null)
                 player.botiUI.SetEquippedTool(player.equippedTool);
+            Debug.Log("[LoadGame] Player restored. Current world pos: " + player.transform.position);
+        }
+        else
+        {
+            Debug.LogWarning("[LoadGame] Player is null!");
         }
 
-        Debug.Log("Game loaded from: " + SavePath);
+        Debug.Log("[LoadGame] Completed successfully.");
     }
 
     private void FindReferences()
