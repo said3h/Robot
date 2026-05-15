@@ -16,7 +16,7 @@ public static class AddBotiToScene
         }
 
         GameObject botiPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-        GameObject botiInstance = PrefabUtility.InstantiatePrefab(botiPrefab);
+        GameObject botiInstance = (GameObject)PrefabUtility.InstantiatePrefab(botiPrefab);
 
         botiInstance.name = "Boti";
         botiInstance.transform.position = new Vector3(0, 0, 0);
