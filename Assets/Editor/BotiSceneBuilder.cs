@@ -79,8 +79,8 @@ public static class BotiSceneBuilder
         light.type = LightType.Directional;
         light.intensity = 1.2f;
         light.color = new Color(1f, 0.95f, 0.85f);
-        light.shadowIntensity = 0.4f;
-        light.shadowDistance = 30f;
+        // light.shadowIntensity = 0.4f;
+        // light.shadowDistance = 30f;
         lightObj.transform.rotation = Quaternion.Euler(50, -30, 0);
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
